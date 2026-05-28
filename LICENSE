@@ -1,0 +1,20 @@
+GNU AFFERO GENERAL PUBLIC LICENSE
+Version 3, 19 November 2007
+
+Copyright (C) 2026 OpenZooData Contributors
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+Additional Information:
+
+- The OpenZooData server software is licensed under AGPLv3.
+- Zoo and species datasets may be licensed separately under ODbL 1.0.
+- The OpenZooData name and logo are protected trademarks and are not covered by this license.
+- ZooGuide, ZooCreator and analytics services may remain proprietary and are not automatically covered by this repository license.
