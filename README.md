@@ -12,7 +12,7 @@ SQLite exports, designed for mobile-first and federated use.
 ## Quick Start
 
 ```bash
-git clone https://github.com/thiborg/openzoodata
+git clone https://github.com/openZooData/openZooData/
 cd openzoodata/source
 cp env.example .env
 # fill in .env
