@@ -1,5 +1,15 @@
 # OpenZooData
 
+![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)
+
+![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)
+
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-required-blue.svg)
+
+![Status](https://img.shields.io/badge/Status-Alpha-orange.svg)
+
+OpenZooData Server is an open-source server implementation for publishing zoo, animal, enclosure and visitor-facing data.
+
 Open infrastructure for structured zoo, animal, enclosure and visitor information.
 
 ## What is OpenZooData?
