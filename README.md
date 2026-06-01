@@ -9,10 +9,33 @@ structured data — species, enclosures, feeding times, maps — in open,
 standardized formats. Data is distributed via RSS feeds and offline-capable
 SQLite exports, designed for mobile-first and federated use.
 
+## Prerequisites
+
+Two PostgreSQL databases are required:
+
+| Database | Default name | Purpose |
+|---|---|---|
+| Zoo database | `zooguide` | Species, enclosures, zoo data |
+| Auth database | `zooguide_auth` | Users, tokens, roles |
+
+Create them before starting the server:
+
+```sql
+CREATE DATABASE zooguide;
+CREATE DATABASE zooguide_auth;
+```
+
+Then apply the schemas:
+
+```bash
+psql -d zooguide -f source/schema/zoo_schema.sql
+psql -d zooguide_auth -f source/schema/auth_schema.sql
+```
+
 ## Quick Start
 
 ```bash
-git clone https://github.com/openZooData/openZooData/
+git clone https://github.com/thiborg/openzoodata
 cd openzoodata/source
 cp env.example .env
 # fill in .env
@@ -57,6 +80,15 @@ python app.py
 
 See [DATA_LICENSE.md](DATA_LICENSE.md) for full details including
 interoperability requirements.
+
+## Core Principles
+
+- Open infrastructure
+- Publicly accessible data
+- Federation instead of vendor lock-in
+- Reusable APIs and feeds
+- Compatibility with Wikidata and Open Data ecosystems
+- Separation of open infrastructure and proprietary client applications
 
 ## Contributing
 
