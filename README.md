@@ -15,30 +15,30 @@ Two PostgreSQL databases are required:
 
 | Database | Default name | Purpose |
 |---|---|---|
-| Zoo database | `zooguide` | Species, enclosures, zoo data |
-| Auth database | `zooguide_auth` | Users, tokens, roles |
+| Zoo database | `openZooData` | Species, enclosures, zoo data |
+| Auth database | `openZooData_auth` | Users, tokens, roles |
 
 Create them before starting the server:
 
 ```sql
-CREATE DATABASE zooguide;
-CREATE DATABASE zooguide_auth;
+CREATE DATABASE "openZooData";
+CREATE DATABASE "openZooData_auth";
 ```
 
 Then apply the schemas:
 
 ```bash
-psql -d zooguide -f source/schema/zoo_schema.sql
-psql -d zooguide_auth -f source/schema/auth_schema.sql
+psql -d openZooData -f source/schema/zoo_schema.sql
+psql -d openZooData_auth -f source/schema/auth_schema.sql
 ```
 
 ## Quick Start
 
 ```bash
-git clone https://github.com/thiborg/openzoodata
-cd openzoodata/source
+git clone https://github.com/openZooData/openZooData
+cd openZooData/source
 cp env.example .env
-# fill in .env
+# fill in .env — set PG_NAME=openZooData and AUTH_NAME=openZooData_auth
 pip install -r requirements.txt
 python app.py
 ```
