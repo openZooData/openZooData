@@ -6,6 +6,8 @@ Please report security vulnerabilities responsibly.
 
 Do NOT open public GitHub issues for sensitive vulnerabilities.
 
+Contact: thorsten@codelab.cafe
+
 ## Recommended Reporting Process
 
 - Provide a detailed description
