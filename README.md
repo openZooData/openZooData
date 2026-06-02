@@ -2,6 +2,8 @@
 
 ![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)
 
+![Powered by Wikidata](https://img.shields.io/badge/Powered%20by-Wikidata-006699)
+
 ![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)
 
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-required-blue.svg)
