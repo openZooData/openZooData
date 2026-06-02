@@ -7,7 +7,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 import hmac
 from werkzeug.exceptions import HTTPException
 
-load_dotenv()
+load_dotenv(Path(__file__).parent.parent / ".env")
 
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
