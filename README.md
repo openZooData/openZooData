@@ -1,18 +1,20 @@
 # OpenZooData
 
-![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)
-
-![Powered by Wikidata](https://img.shields.io/badge/Powered%20by-Wikidata-006699)
+![License](https://img.shields.io/badge/Code-AGPL--3.0-blue.svg)
+![Data](https://img.shields.io/badge/Data-ODbL--1.0-green.svg)
+![Docs](https://img.shields.io/badge/Docs-CC%20BY--SA%204.0-orange.svg)
+![Powered by Wikidata](https://img.shields.io/badge/Powered%20by-Wikidata-006699.svg)
 
 ![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)  ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-required-blue.svg)
 
-
-
 ![Status](https://img.shields.io/badge/Status-Alpha-orange.svg)
 
-OpenZooData Server is an open-source server implementation for publishing zoo, animal, enclosure and visitor-facing data.
+Open infrastructure for zoo, animal, enclosure and visitor data.
 
-Open infrastructure for structured zoo, animal, enclosure and visitor information.
+Species are linked to Wikidata identifiers to provide stable,
+multilingual and interoperable references across the open-data ecosystem.
+
+➡️ See [Wikidata Integration](docs/wikidata.md)
 
 ## What is OpenZooData?
 
