@@ -43,10 +43,11 @@ set +a
 
 run_psql() {
   local host="$1"
-  local user="$2"
-  local db="$3"
-  local password="$4"
-  local schema_file="$5"
+  local port="$2"
+  local user="$3"
+  local db="$4"
+  local password="$5"
+  local schema_file="$6"
 
   if [[ ! -f "$schema_file" ]]; then
     echo "ERROR: schema file not found: $schema_file"
@@ -57,10 +58,12 @@ run_psql() {
   echo "  Database: $db"
   echo "  User:     $user"
   echo "  Host:     $host"
+  echo "  Port:     $port"
   echo "  File:     $schema_file"
 
   PGPASSWORD="$password" psql \
     -h "$host" \
+    -p "$port" \
     -U "$user" \
     -d "$db" \
     -v ON_ERROR_STOP=1 \
@@ -71,27 +74,31 @@ run_psql() {
 }
 
 if [[ "$INIT_AUTH" == true ]]; then
-  : "${AUTH_DB_HOST:?AUTH_DB_HOST missing in .env}"
-  : "${AUTH_DB_USER:?AUTH_DB_USER missing in .env}"
-  : "${AUTH_DB_PASSWORD:?AUTH_DB_PASSWORD missing in .env}"
-  : "${AUTH_DB_NAME:?AUTH_DB_NAME missing in .env}"
+  : "${AUTH_HOST:?AUTH_HOST missing in .env}"
+  : "${AUTH_PORT:=?AUTH_PORT missing in .env}}"
+  : "${AUTH_USER:?AUTH_USER missing in .env}"
+  : "${AUTH_PASSWORD:?AUTH_PASSWORD missing in .env}"
+  : "${AUTH_NAME:?AUTH_NAME missing in .env}"
 
   run_psql \
-    "$AUTH_DB_HOST" \
-    "$AUTH_DB_USER" \
-    "$AUTH_DB_NAME" \
-    "$AUTH_DB_PASSWORD" \
+    "$AUTH_HOST" \
+    "$AUTH_PORT" \
+    "$AUTH_USER" \
+    "$AUTH_NAME" \
+    "$AUTH_PASSWORD" \
     "$AUTH_SCHEMA"
 fi
 
 if [[ "$INIT_ZOO" == true ]]; then
   : "${PG_HOST:?PG_HOST missing in .env}"
+  : "${PG_PORT:=?PG_PORT missing in .env}}"
   : "${PG_USER:?PG_USER missing in .env}"
   : "${PG_PASSWORD:?PG_PASSWORD missing in .env}"
   : "${PG_NAME:?PG_NAME missing in .env}"
 
   run_psql \
     "$PG_HOST" \
+    "$PG_PORT" \
     "$PG_USER" \
     "$PG_NAME" \
     "$PG_PASSWORD" \
