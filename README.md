@@ -4,9 +4,9 @@
 
 ![Powered by Wikidata](https://img.shields.io/badge/Powered%20by-Wikidata-006699)
 
-![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)
+![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)  ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-required-blue.svg)
 
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-required-blue.svg)
+
 
 ![Status](https://img.shields.io/badge/Status-Alpha-orange.svg)
 
