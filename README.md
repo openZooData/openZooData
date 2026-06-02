@@ -14,7 +14,7 @@ Open infrastructure for zoo, animal, enclosure and visitor data.
 Species are linked to Wikidata identifiers to provide stable,
 multilingual and interoperable references across the open-data ecosystem.
 
-➡️ See [Wikidata Integration](docs/wikidata.md)
+➡️ See [Wikidata Integration](docs/wikidata_integration.md)
 
 ## What is OpenZooData?
 
