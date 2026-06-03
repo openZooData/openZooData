@@ -45,4 +45,5 @@ echo
 echo "========================================"
 echo
 
-wait "$PID"
+echo "OpenZooData running in background."
+exit 0
