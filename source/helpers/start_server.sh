@@ -29,7 +29,7 @@ PID=$!
 echo "Started OpenZooData Gunicorn"
 echo "PID:  $PID"
 echo "Port: $PORT"
-
+echo "$PID" > "$LOG_DIR/gunicorn.pid"
 sleep 3
 
 echo
@@ -43,7 +43,6 @@ curl -s \
 
 echo
 echo "========================================"
-echo
-
 echo "OpenZooData running in background."
+echo
 exit 0
