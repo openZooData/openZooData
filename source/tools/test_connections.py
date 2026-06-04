@@ -6,13 +6,11 @@ Testet alle Datenbankverbindungen aus .env
 Aufruf: python3 tools/test_connections.py
 """
 
-import os
 import sys
 from pathlib import Path
 
 
 def load_env():
-    """Minimaler .env-Loader ohne externe Abhängigkeit."""
     env = {}
     path = Path(".env")
     if not path.exists():
@@ -27,6 +25,14 @@ def load_env():
 
 
 env = load_env()
+
+
+def require_env(name):
+    value = env.get(name)
+    if not value:
+        raise RuntimeError(f"Missing required environment variable: {name}")
+    return value
+
 
 ok = 0
 fail = 0
@@ -44,17 +50,14 @@ def check(label, fn):
         fail += 1
 
 
-# ------------------------------------------------------
-# PostgreSQL Auth DB
-# ------------------------------------------------------
 def test_pg_auth():
     import psycopg2
 
     conn = psycopg2.connect(
-        host=env.get("AUTH_HOST"),
-        user=env.get("AUTH_USER"),
-        password=env.get("AUTH_PASSWORD"),
-        dbname=env.get("AUTH_NAME", "zooguide_auth"),
+        host=require_env("AUTH_HOST"),
+        user=require_env("AUTH_USER"),
+        password=require_env("AUTH_PASSWORD"),
+        dbname=require_env("AUTH_NAME"),
         port=int(env.get("AUTH_PORT", "5432")),
     )
     cur = conn.cursor()
@@ -67,20 +70,14 @@ def test_pg_auth():
     conn.close()
 
 
-check("PostgreSQL Auth DB", test_pg_auth)
-
-
-# ------------------------------------------------------
-# PostgreSQL ZooGuide
-# ------------------------------------------------------
 def test_pg_zooguide():
     import psycopg2
 
     conn = psycopg2.connect(
-        host=env.get("PG_HOST"),
-        user=env.get("PG_USER"),
-        password=env.get("PG_PASSWORD"),
-        dbname=env.get("PG_DATABASE", "zooguide"),
+        host=require_env("PG_HOST"),
+        user=require_env("PG_USER"),
+        password=require_env("PG_PASSWORD"),
+        dbname=require_env("PG_DATABASE"),
         port=int(env.get("PG_PORT", "5432")),
         options="-c search_path=zoo,public",
     )
@@ -94,12 +91,9 @@ def test_pg_zooguide():
     conn.close()
 
 
+check("PostgreSQL Auth DB", test_pg_auth)
 check("PostgreSQL ZooGuide", test_pg_zooguide)
 
-
-# ------------------------------------------------------
-# Ergebnis
-# ------------------------------------------------------
 print(f"\n{'=' * 40}")
 print(f"Ergebnis: {ok} OK, {fail} Fehler")
 if fail > 0:
