@@ -15,7 +15,7 @@ def get_pg_connection():
         port=os.getenv("PG_PORT", "5432"),
         user=_require_env("PG_USER"),
         password=_require_env("PG_PASSWORD"),
-        dbname=_require_env("PG_DATABASE"),
+        dbname=_require_env("PG_NAME"),
     )
 
 

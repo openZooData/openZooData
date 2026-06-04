@@ -45,7 +45,7 @@ DB_CONFIG = {
     "host":     env.get("PG_HOST"),
     "user":     env.get("PG_USER"),
     "password": env.get("PG_PASSWORD"),
-    "dbname":   env.get("PG_DATABASE", "zooguide"),
+    "dbname":   env.get("PG_NAME"),
     "port":     int(env.get("DB_PORT", "5432")),
     "options":  "-c search_path=zoo,public",
 }

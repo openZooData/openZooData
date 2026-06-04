@@ -17,7 +17,7 @@ set -e
 
 # Credentials aus ~/.env laden
 if [ -f ~/.env ]; then
-    export $(grep -E '^(PG_HOST|PG_PORT|PG_USER|PG_PASSWORD|PG_DATABASE)=' ~/.env | xargs)
+    export $(grep -E '^(PG_HOST|PG_PORT|PG_USER|PG_PASSWORD|PG_NAME)=' ~/.env | xargs)
 else
     echo "FEHLER: ~/.env nicht gefunden"
     exit 1
@@ -39,7 +39,7 @@ PGPASSWORD=$PG_PASSWORD pg_dump \
     -h "${PG_HOST}" \
     -p "${PG_PORT:-5432}" \
     -U "${PG_USER}" \
-    -d "${PG_DATABASE:-zooguide}" \
+    -d "${PG_NAME:-zooguide}" \
     --schema=zoo \
     -F c \
     -f "$FILEPATH"

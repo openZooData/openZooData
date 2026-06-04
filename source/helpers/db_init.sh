@@ -55,13 +55,13 @@ if [[ "$INIT_ZOO" == true ]]; then
   : "${PG_PORT:?PG_PORT missing in .env}"
   : "${PG_USER:?PG_USER missing in .env}"
   : "${PG_PASSWORD:?PG_PASSWORD missing in .env}"
-  : "${PG_DATABASE:?PG_DATABASE missing in .env}"
+  : "${PG_NAME:?PG_NAME missing in .env}"
 
   run_psql \
     "$PG_HOST" \
     "$PG_PORT" \
     "$PG_USER" \
-    "$PG_DATABASE" \
+    "$PG_NAME" \
     "$PG_PASSWORD" \
     "$ZOO_SCHEMA"
 fi

@@ -35,7 +35,7 @@ PG_CONFIG = {
     "host":    os.getenv("PG_HOST"),
     "user":    os.getenv("PG_USER"),
     "password":os.getenv("PG_PASSWORD"),
-    "dbname":  os.getenv("PG_DATABASE", "zooguide"),
+    "dbname":  os.getenv("PG_NAME"),
     "port":    int(os.getenv("PG_PORT", "5432")),
     "options": "-c search_path=zoo,public"
 }
