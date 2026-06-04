@@ -4,10 +4,10 @@ routes/feedback.py — Community Feedback API
 Endpoints:
     GET    /api/v1/feedback-types                           → require_app_token
     POST   /api/v1/zoos/<zoo>/feedback                     → require_app_token
-    GET    /api/v1/zoos/<zoo>/feedback                     → require_jwt_write
-    GET    /api/v1/zoos/<zoo>/feedback/<id>                → require_jwt_write
-    PUT    /api/v1/zoos/<zoo>/feedback/<id>/accept         → require_jwt_write
-    PUT    /api/v1/zoos/<zoo>/feedback/<id>/reject         → require_jwt_write
+    GET    /api/v1/zoos/<zoo>/feedback                     → require_zoo_access (admin)
+    GET    /api/v1/zoos/<zoo>/feedback/<id>                → require_zoo_access (admin)
+    PUT    /api/v1/zoos/<zoo>/feedback/<id>/accept         → require_zoo_access (admin)
+    PUT    /api/v1/zoos/<zoo>/feedback/<id>/reject         → require_zoo_access (admin)
 """
 
 import logging
@@ -16,7 +16,8 @@ import psycopg2.extras
 from flask import Blueprint, request, jsonify
 
 from db           import get_pg_connection
-from helpers.auth_utils import require_app_token, require_jwt_write
+from helpers.auth_utils import require_app_token
+from helpers.authz import require_zoo_access
 from extensions   import limiter
 
 feedback_bp = Blueprint("feedback", __name__)
@@ -176,7 +177,7 @@ def create_feedback(zoo):
     try:
         pg = get_pg_connection()
         with pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute("SELECT id FROM zoos WHERE slug = %s", (zoo,))
+            cur.execute("SELECT id FROM zoo.zoos WHERE slug = %s", (zoo,))
             zoo_row = cur.fetchone()
             if not zoo_row:
                 return jsonify({"error": "Zoo not found"}), 404
@@ -239,7 +240,7 @@ def create_feedback(zoo):
 @feedback_bp.route("/api/v1/zoos/<zoo>/feedback", methods=["GET"])
 @limiter.limit("60 per minute")
 def get_feedback(zoo):
-    key_data, err = require_jwt_write(zoo)
+    user_id, err = require_zoo_access(zoo, 'admin')
     if err: return err
 
     status = request.args.get("status", "pending")
@@ -283,12 +284,12 @@ def get_feedback(zoo):
                     MAX(f.review_comment)                    AS review_comment,
                     MAX(f.reviewed_at)                       AS reviewed_at,
                     MAX(f.reviewed_by)                       AS reviewed_by
-                FROM feedback f
-                JOIN zoos z             ON z.id  = f.zoo_id
-                JOIN feedback_types ft  ON ft.id = f.feedback_type_id
-                LEFT JOIN enclosures e  ON e.id  = f.enclosure_id
-                LEFT JOIN species s     ON s.id  = f.value_species_id
-                LEFT JOIN feedback_report_reasons rr ON rr.id = f.value_report_reason_id
+                FROM zoo.feedback f
+                JOIN zoo.zoos z             ON z.id  = f.zoo_id
+                JOIN zoo.feedback_types ft  ON ft.id = f.feedback_type_id
+                LEFT JOIN zoo.enclosures e  ON e.id  = f.enclosure_id
+                LEFT JOIN zoo.species s     ON s.id  = f.value_species_id
+                LEFT JOIN zoo.feedback_report_reasons rr ON rr.id = f.value_report_reason_id
                 WHERE z.slug = %s
                   AND f.status = %s
                   AND ft.requires_admin_review = TRUE
@@ -310,9 +311,9 @@ def get_feedback(zoo):
             cur.execute("""
                 SELECT COUNT(*) AS total FROM (
                     SELECT 1
-                    FROM feedback f
-                    JOIN zoos z            ON z.id  = f.zoo_id
-                    JOIN feedback_types ft ON ft.id = f.feedback_type_id
+                    FROM zoo.feedback f
+                    JOIN zoo.zoos z            ON z.id  = f.zoo_id
+                    JOIN zoo.feedback_types ft ON ft.id = f.feedback_type_id
                     WHERE z.slug = %s AND f.status = %s
                       AND ft.requires_admin_review = TRUE
                     GROUP BY
@@ -354,7 +355,7 @@ def get_feedback(zoo):
 @feedback_bp.route("/api/v1/zoos/<zoo>/feedback/<int:feedback_id>", methods=["GET"])
 @limiter.limit("60 per minute")
 def get_feedback_item(zoo, feedback_id):
-    key_data, err = require_jwt_write(zoo)
+    user_id, err = require_zoo_access(zoo, 'admin')
     if err: return err
 
     pg = None
@@ -378,12 +379,12 @@ def get_feedback_item(zoo, feedback_id):
                     f.value_report_reason_id,
                     rr.label_de   AS report_reason_label,
                     f.value_language
-                FROM feedback f
-                JOIN zoos z             ON z.id  = f.zoo_id
-                JOIN feedback_types ft  ON ft.id = f.feedback_type_id
-                LEFT JOIN enclosures e  ON e.id  = f.enclosure_id
-                LEFT JOIN species s     ON s.id  = f.value_species_id
-                LEFT JOIN feedback_report_reasons rr ON rr.id = f.value_report_reason_id
+                FROM zoo.feedback f
+                JOIN zoo.zoos z             ON z.id  = f.zoo_id
+                JOIN zoo.feedback_types ft  ON ft.id = f.feedback_type_id
+                LEFT JOIN zoo.enclosures e  ON e.id  = f.enclosure_id
+                LEFT JOIN zoo.species s     ON s.id  = f.value_species_id
+                LEFT JOIN zoo.feedback_report_reasons rr ON rr.id = f.value_report_reason_id
                 WHERE z.slug = %s AND f.id = %s
             """, (zoo, feedback_id))
             row = cur.fetchone()
@@ -414,7 +415,7 @@ def get_feedback_item(zoo, feedback_id):
 @feedback_bp.route("/api/v1/zoos/<zoo>/feedback/<int:feedback_id>/accept", methods=["PUT"])
 @limiter.limit("30 per minute")
 def accept_feedback(zoo, feedback_id):
-    key_data, err = require_jwt_write(zoo)
+    user_id, err = require_zoo_access(zoo, 'admin')
     if err: return err
 
     data     = request.get_json(silent=True) or {}
@@ -426,8 +427,8 @@ def accept_feedback(zoo, feedback_id):
         pg = get_pg_connection()
         with pg.cursor() as cur:
             cur.execute("""
-                SELECT f.id FROM feedback f
-                JOIN zoos z ON z.id = f.zoo_id
+                SELECT f.id FROM zoo.feedback f
+                JOIN zoo.zoos z ON z.id = f.zoo_id
                 WHERE f.id = %s AND z.slug = %s AND f.status = 'pending'
             """, (feedback_id, zoo))
             if not cur.fetchone():
@@ -435,15 +436,15 @@ def accept_feedback(zoo, feedback_id):
 
             all_ids = list({feedback_id} | set(also_ids))
             cur.execute("""
-                UPDATE feedback SET
+                UPDATE zoo.feedback SET
                     status         = 'accepted',
                     review_comment = %s,
                     reviewed_at    = NOW(),
                     reviewed_by    = %s
                 WHERE id = ANY(%s)
-                AND zoo_id = (SELECT id FROM zoos WHERE slug = %s)
+                AND zoo_id = (SELECT id FROM zoo.zoos WHERE slug = %s)
                 AND status = 'pending'
-            """, (comment, key_data.get("zoo_dir"), all_ids, zoo))
+            """, (comment, str(user_id), all_ids, zoo))
             updated = cur.rowcount
 
         pg.commit()
@@ -464,7 +465,7 @@ def accept_feedback(zoo, feedback_id):
 @feedback_bp.route("/api/v1/zoos/<zoo>/feedback/<int:feedback_id>/reject", methods=["PUT"])
 @limiter.limit("30 per minute")
 def reject_feedback(zoo, feedback_id):
-    key_data, err = require_jwt_write(zoo)
+    user_id, err = require_zoo_access(zoo, 'admin')
     if err: return err
 
     data     = request.get_json(silent=True) or {}
@@ -477,15 +478,15 @@ def reject_feedback(zoo, feedback_id):
         with pg.cursor() as cur:
             all_ids = list({feedback_id} | set(also_ids))
             cur.execute("""
-                UPDATE feedback SET
+                UPDATE zoo.feedback SET
                     status         = 'rejected',
                     review_comment = %s,
                     reviewed_at    = NOW(),
                     reviewed_by    = %s
                 WHERE id = ANY(%s)
-                AND zoo_id = (SELECT id FROM zoos WHERE slug = %s)
+                AND zoo_id = (SELECT id FROM zoo.zoos WHERE slug = %s)
                 AND status = 'pending'
-            """, (comment, key_data.get("zoo_dir"), all_ids, zoo))
+            """, (comment, str(user_id), all_ids, zoo))
 
             if cur.rowcount == 0:
                 return jsonify({"error": "Not found or already reviewed"}), 404

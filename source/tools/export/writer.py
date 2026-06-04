@@ -133,7 +133,11 @@ def export_zoo(pg, zoo_id: int, slug: str, output_dir: Path) -> Path:
         tmp_path = Path(tmp_file.name)
 
     try:
-        _increment_data_version(pg, slug)
+        # Migration v7: data_version wird NICHT mehr hier erhöht.
+        # Das Increment erfolgt ausschließlich in routes/publish.py
+        # nach erfolgreichem Export — verhindert doppeltes Increment.
+        # Funktion _increment_data_version() bleibt als Fallback erhalten
+        # aber wird nicht mehr automatisch aufgerufen.
         _do_export(pg, zoo_id, slug, tmp_path)
 
         if not tmp_path.is_file():

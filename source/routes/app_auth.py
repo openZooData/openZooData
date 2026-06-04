@@ -7,6 +7,10 @@ Ein App-Token authentifiziert eine App-Installation (device_id), nicht
 einen Nutzer. Er berechtigt zu: SQLite-Download, Analytics, Feedback.
 Kein Schreibzugriff auf Zoo-Daten.
 
+Migration v7: get_auth_connection() → get_auth_connection()
+Tabelle: auth.app_tokens (schemaqualifiziert)
+App-Tokens sind inhaltlich UNVERÄNDERT — nur DB-Verbindung angepasst.
+
 Endpoints:
     POST /api/v1/auth/app_register  — Erster Start oder Token abgelaufen
     POST /api/v1/auth/app_refresh   — Token verlängern (< 30 Tage bis Ablauf)
@@ -25,9 +29,9 @@ from extensions import limiter
 app_auth_bp = Blueprint("app_auth", __name__)
 
 APP_TOKEN_EXPIRY_DAYS  = 90
-APP_TOKEN_REFRESH_DAYS = 30   # Verlängern wenn weniger als 30 Tage verbleiben
+APP_TOKEN_REFRESH_DAYS = 30
 
-# UUID v4 Format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx (case-insensitive)
+
 _UUID_RE = re.compile(
     r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
     re.IGNORECASE
@@ -45,8 +49,9 @@ def _issue_token(conn, device_id: str) -> dict:
     expires_at = datetime.now(timezone.utc) + timedelta(days=APP_TOKEN_EXPIRY_DAYS)
 
     with conn.cursor() as cur:
+        # Migration v7: schemaqualifiziert
         cur.execute("""
-            INSERT INTO app_tokens (device_id, token_hash, expires_at)
+            INSERT INTO auth.app_tokens (device_id, token_hash, expires_at)
             VALUES (%s, %s, %s)
         """, (device_id, token_hash, expires_at))
 
@@ -62,14 +67,11 @@ def app_register():
     """
     Registriert eine App-Installation und gibt einen App-Token zurück.
 
-    Request:
-        { "device_id": "<uuid>" }
+    Request:  { "device_id": "<uuid>" }
+    Response: { "app_token": "<hex64>", "expires_at": "<iso8601>" }
 
-    Response:
-        { "app_token": "<hex64>", "expires_at": "<iso8601>" }
-
-    Idempotent: Gleiche device_id kann mehrfach registriert werden
-    (z.B. nach Token-Ablauf). Alte Tokens werden deaktiviert.
+    Idempotent: Gleiche device_id kann mehrfach registriert werden.
+    Alte Tokens werden deaktiviert.
     """
     data      = request.get_json(silent=True) or {}
     device_id = data.get("device_id", "").strip()
@@ -83,10 +85,9 @@ def app_register():
     try:
         conn = get_auth_connection()
 
-        # Alte aktive Tokens für diese device_id deaktivieren
         with conn.cursor() as cur:
             cur.execute("""
-                UPDATE app_tokens
+                UPDATE auth.app_tokens
                 SET is_active = FALSE
                 WHERE device_id = %s AND is_active = TRUE
             """, (device_id,))
@@ -109,17 +110,9 @@ def app_refresh():
     """
     Verlängert einen App-Token wenn er in weniger als 30 Tagen abläuft.
 
-    Request:
-        { "app_token": "<hex64>", "device_id": "<uuid>" }
-
-    Response (Token verlängert):
-        { "app_token": "<hex64>", "expires_at": "<iso8601>", "refreshed": true }
-
-    Response (Token noch gültig, kein Refresh nötig):
-        { "app_token": "<aktueller token>", "expires_at": "<iso8601>", "refreshed": false }
-
-    Response (Token abgelaufen oder ungültig):
-        HTTP 403 → App soll app_register aufrufen
+    Request:  { "app_token": "<hex64>", "device_id": "<uuid>" }
+    Response: { "app_token": ..., "expires_at": ..., "refreshed": bool }
+    HTTP 403: Token abgelaufen → App soll app_register aufrufen.
     """
     data      = request.get_json(silent=True) or {}
     app_token = data.get("app_token", "").strip()
@@ -139,7 +132,7 @@ def app_refresh():
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT id, device_id, expires_at
-                FROM app_tokens
+                FROM auth.app_tokens
                 WHERE token_hash = %s
                   AND is_active = TRUE
                   AND expires_at > NOW()
@@ -151,16 +144,14 @@ def app_refresh():
 
         token_id, db_device_id, expires_at = row
 
-        # device_id muss übereinstimmen
         if db_device_id != device_id:
             return jsonify({"error": "Unauthorized"}), 403
 
-        # Noch mehr als 30 Tage gültig — kein Refresh nötig
         remaining = expires_at - datetime.now(timezone.utc)
         if remaining.days > APP_TOKEN_REFRESH_DAYS:
             with conn.cursor() as cur:
                 cur.execute(
-                    "UPDATE app_tokens SET last_used_at = NOW() WHERE id = %s",
+                    "UPDATE auth.app_tokens SET last_used_at = NOW() WHERE id = %s",
                     (token_id,)
                 )
             conn.commit()
@@ -170,10 +161,9 @@ def app_refresh():
                 "refreshed":  False,
             }), 200
 
-        # Alten Token deaktivieren und neuen ausstellen
         with conn.cursor() as cur:
             cur.execute(
-                "UPDATE app_tokens SET is_active = FALSE WHERE id = %s",
+                "UPDATE auth.app_tokens SET is_active = FALSE WHERE id = %s",
                 (token_id,)
             )
 

@@ -1,14 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# OpenZooData database initialization script
-# Usage:
-#   ./source/helpers/db_init.sh
-#
-# Optional:
-#   ./source/helpers/db_init.sh --auth-only
-#   ./source/helpers/db_init.sh --zoo-only
-
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 ENV_FILE="$ROOT_DIR/.env"
 SCHEMA_DIR="$ROOT_DIR/source/schema"
@@ -49,18 +41,6 @@ run_psql() {
   local password="$5"
   local schema_file="$6"
 
-  if [[ ! -f "$schema_file" ]]; then
-    echo "ERROR: schema file not found: $schema_file"
-    exit 1
-  fi
-
-  echo "Importing schema:"
-  echo "  Database: $db"
-  echo "  User:     $user"
-  echo "  Host:     $host"
-  echo "  Port:     $port"
-  echo "  File:     $schema_file"
-
   PGPASSWORD="$password" psql \
     -h "$host" \
     -p "$port" \
@@ -68,14 +48,33 @@ run_psql() {
     -d "$db" \
     -v ON_ERROR_STOP=1 \
     -f "$schema_file"
-
-  echo "Done: $schema_file"
-  echo
 }
 
+if [[ "$INIT_ZOO" == true ]]; then
+  : "${PG_HOST:?PG_HOST missing in .env}"
+  : "${PG_PORT:?PG_PORT missing in .env}"
+  : "${PG_USER:?PG_USER missing in .env}"
+  : "${PG_PASSWORD:?PG_PASSWORD missing in .env}"
+  : "${PG_DATABASE:?PG_DATABASE missing in .env}"
+
+  run_psql \
+    "$PG_HOST" \
+    "$PG_PORT" \
+    "$PG_USER" \
+    "$PG_DATABASE" \
+    "$PG_PASSWORD" \
+    "$ZOO_SCHEMA"
+fi
+
 if [[ "$INIT_AUTH" == true ]]; then
+  AUTH_HOST="${AUTH_HOST:-}"
+  AUTH_PORT="${AUTH_PORT:-5432}"
+  AUTH_USER="${AUTH_USER:-}"
+  AUTH_PASSWORD="${AUTH_PASSWORD:-}"
+  AUTH_NAME="${AUTH_NAME:-zooguide_auth}"
+
   : "${AUTH_HOST:?AUTH_HOST missing in .env}"
-  : "${AUTH_PORT:=?AUTH_PORT missing in .env}}"
+  : "${AUTH_PORT:?AUTH_PORT missing in .env}"
   : "${AUTH_USER:?AUTH_USER missing in .env}"
   : "${AUTH_PASSWORD:?AUTH_PASSWORD missing in .env}"
   : "${AUTH_NAME:?AUTH_NAME missing in .env}"
@@ -87,22 +86,6 @@ if [[ "$INIT_AUTH" == true ]]; then
     "$AUTH_NAME" \
     "$AUTH_PASSWORD" \
     "$AUTH_SCHEMA"
-fi
-
-if [[ "$INIT_ZOO" == true ]]; then
-  : "${PG_HOST:?PG_HOST missing in .env}"
-  : "${PG_PORT:=?PG_PORT missing in .env}}"
-  : "${PG_USER:?PG_USER missing in .env}"
-  : "${PG_PASSWORD:?PG_PASSWORD missing in .env}"
-  : "${PG_NAME:?PG_NAME missing in .env}"
-
-  run_psql \
-    "$PG_HOST" \
-    "$PG_PORT" \
-    "$PG_USER" \
-    "$PG_NAME" \
-    "$PG_PASSWORD" \
-    "$ZOO_SCHEMA"
 fi
 
 echo "Database initialization completed."

@@ -41,17 +41,13 @@ done
 echo "   .env OK"
 
 # ------------------------------------------------------
-# 2. JWT_SECRET und ANALYTICS_SALT generieren falls fehlend
+# 2. JWT_SECRET generieren falls fehlend
 # ------------------------------------------------------
 echo ""
 echo "[2/6] Prüfe Secrets..."
 if ! grep -q "^JWT_SECRET=" ~/.env || [ -z "$(grep '^JWT_SECRET=' ~/.env | cut -d'=' -f2)" ]; then
     echo "   Generiere JWT_SECRET..."
     echo "JWT_SECRET=$(openssl rand -hex 32)" >> ~/.env
-fi
-if ! grep -q "^ANALYTICS_SALT=" ~/.env || [ -z "$(grep '^ANALYTICS_SALT=' ~/.env | cut -d'=' -f2)" ]; then
-    echo "   Generiere ANALYTICS_SALT..."
-    echo "ANALYTICS_SALT=$(openssl rand -hex 32)" >> ~/.env
 fi
 echo "   Secrets OK"
 

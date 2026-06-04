@@ -5,7 +5,7 @@ import psycopg2.extras
 from mimetypes import guess_type
 from flask import Blueprint, jsonify, request, send_file
 
-from helpers.auth_utils import require_jwt_read, require_jwt_write
+from helpers.authz import require_zoo_access
 from helpers.coordinates import is_valid_slug
 from db import get_pg_connection
 from extensions import limiter
@@ -38,7 +38,7 @@ def serve_file(storage_path):
     first_segment = os.path.normpath(storage_path).split(os.sep, 1)[0]
     if not is_valid_slug(first_segment):
         return jsonify({"error": "Invalid path"}), 400
-    payload, err = require_jwt_read(first_segment)
+    user_id, err = require_zoo_access(first_segment, 'read')
     if err: return err
 
     full_path    = storage.full_path(storage_path)
@@ -59,7 +59,7 @@ def list_media(entity_type, entity_id):
         return jsonify({"error": "Invalid entity_type"}), 400
 
     zoo = request.args.get("zoo", "")
-    payload, err = require_jwt_read(zoo)
+    user_id, err = require_zoo_access(zoo, 'read')
     if err: return err
 
     conn = None
@@ -115,7 +115,7 @@ def upload_media(entity_type, entity_id):
     if not zoo:
         return jsonify({"error": "Missing zoo parameter"}), 400
 
-    key_data, err = require_jwt_write(zoo)
+    user_id, err = require_zoo_access(zoo, 'write')
     if err: return err
 
     if "file" not in request.files or not request.files["file"].filename:
@@ -202,7 +202,7 @@ def upload_media(entity_type, entity_id):
             """, (
                 entity_type, entity_id, wikidata_id, safe_filename, storage_path,
                 mime_type, actual_size, sort_order, label,
-                key_data.get("zoo_dir"), zoo_id
+                str(user_id), zoo_id
             ))
             new_id = cur.fetchone()["id"]
 
@@ -231,7 +231,7 @@ def delete_media(media_id):
     if not zoo:
         return jsonify({"error": "Missing zoo parameter"}), 400
 
-    key_data, err = require_jwt_write(zoo)
+    user_id, err = require_zoo_access(zoo, 'write')
     if err: return err
 
     conn = None
