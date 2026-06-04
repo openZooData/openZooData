@@ -16,6 +16,7 @@ def get_pg_connection():
         user=_require_env("PG_USER"),
         password=_require_env("PG_PASSWORD"),
         dbname=_require_env("PG_NAME"),
+        options="-c search_path=zoo,public",
     )
 
 

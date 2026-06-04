@@ -7,7 +7,7 @@ Ein App-Token authentifiziert eine App-Installation (device_id), nicht
 einen Nutzer. Er berechtigt zu: SQLite-Download, Analytics, Feedback.
 Kein Schreibzugriff auf Zoo-Daten.
 
-Migration v7: get_auth_connection() → get_auth_connection()
+Migration v7: App-Tokens verbleiben in Auth-DB (get_auth_connection())
 Tabelle: auth.app_tokens (schemaqualifiziert)
 App-Tokens sind inhaltlich UNVERÄNDERT — nur DB-Verbindung angepasst.
 

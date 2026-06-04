@@ -72,28 +72,13 @@ def create_species():
             "error": "wikidata_id required. Without a validated Wikidata ID, submit a proposal instead."
         }), 400
 
-    # Berechtigungsprüfung: editor auf einem Zoo ODER super_admin
-    # super_admin hat implizit can_access_zoo=True für alle Zoos
-    from helpers.authz import can_access_zoo
-    from db import get_auth_connection as _get_conn
-    import psycopg2.extras as _extras
+    # Berechtigungsprüfung: editor/zoo_admin auf einem Zoo ODER super_admin
+    # can_access_zoo() ist die einzige autoritative Quelle — kein direkter DB-Zugriff hier.
+    from helpers.authz import can_access_zoo, require_super_admin
 
-    # super_admin check
-    is_super = False
-    _conn = None
-    try:
-        _conn = _get_conn()
-        with _conn.cursor() as cur:
-            cur.execute("""
-                SELECT 1 FROM auth.user_global_roles
-                WHERE user_id = %s AND role = 'super_admin'
-            """, (user_id,))
-            is_super = bool(cur.fetchone())
-    except Exception:
-        pass
-    finally:
-        if _conn:
-            _conn.close()
+    # super_admin darf zoo-übergreifend anlegen (kein zoo_slug nötig)
+    _sa_id, _sa_err = require_super_admin()
+    is_super = _sa_id is not None
 
     if not is_super:
         if not zoo_slug:

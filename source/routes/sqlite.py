@@ -30,7 +30,7 @@ def get_sqlite(zoo):
         pg = get_pg_connection()
         with pg.cursor() as cur:
             cur.execute(
-                "SELECT data_version FROM zoos WHERE slug = %s",
+                "SELECT data_version FROM zoo.zoos WHERE slug = %s",
                 (zoo,)
             )
             row = cur.fetchone()

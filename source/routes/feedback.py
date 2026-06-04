@@ -35,7 +35,7 @@ def _get_feedback_types():
         with pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
                 SELECT id, slug, label_de, entity_type, requires_admin_review
-                FROM feedback_types
+                FROM zoo.feedback_types
                 WHERE is_active = TRUE
                 ORDER BY id
             """)
@@ -97,7 +97,7 @@ def get_feedback_types():
         with pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
                 SELECT id, slug, label_de, entity_type, requires_admin_review
-                FROM feedback_types
+                FROM zoo.feedback_types
                 WHERE is_active = TRUE
                 ORDER BY id
             """)
@@ -105,7 +105,7 @@ def get_feedback_types():
 
             cur.execute("""
                 SELECT id, slug, label_de
-                FROM feedback_report_reasons
+                FROM zoo.feedback_report_reasons
                 ORDER BY id
             """)
             reasons = [dict(r) for r in cur.fetchall()]
@@ -186,7 +186,7 @@ def create_feedback(zoo):
             # Fix 6: enclosure_id und value_species_id gegen Zoo validieren
             if enclosure_id is not None:
                 cur.execute("""
-                    SELECT id FROM enclosures
+                    SELECT id FROM zoo.enclosures
                     WHERE id = %s AND zoo_id = %s
                 """, (enclosure_id, zoo_id))
                 if not cur.fetchone():

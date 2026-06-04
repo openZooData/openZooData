@@ -151,7 +151,7 @@ def get_feed(zoo):
                     id, slug, name, url, description,
                     top_left_latitude, top_left_longitude,
                     data_version, icon_url
-                FROM zoos
+                FROM zoo.zoos
                 WHERE slug = %s AND is_active = TRUE
             """, (zoo,))
             zoo_row = cur.fetchone()
@@ -164,7 +164,7 @@ def get_feed(zoo):
             with pg.cursor() as cur:
                 cur.execute("""
                     SELECT version, file_size, exported_at, changelog
-                    FROM zoo_exports
+                    FROM zoo.zoo_exports
                     WHERE zoo_slug = %s
                     ORDER BY version DESC
                     LIMIT 5
@@ -208,7 +208,7 @@ def list_feeds():
         with pg.cursor() as cur:
             cur.execute("""
                 SELECT slug, name, data_version
-                FROM zoos
+                FROM zoo.zoos
                 WHERE is_active = TRUE
                 ORDER BY name
             """)
