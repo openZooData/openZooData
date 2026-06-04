@@ -21,7 +21,7 @@ SET row_security = off;
 -- Name: community; Type: SCHEMA; Schema: -; Owner: -
 --
 
-CREATE SCHEMA community;
+CREATE SCHEMA IF NOT EXISTS community;
 
 
 --
@@ -42,7 +42,7 @@ COMMENT ON SCHEMA public IS '';
 -- Name: zoo; Type: SCHEMA; Schema: -; Owner: -
 --
 
-CREATE SCHEMA zoo;
+CREATE SCHEMA IF NOT EXISTS zoo;
 
 
 SET default_tablespace = '';
