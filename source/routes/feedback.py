@@ -193,7 +193,7 @@ def create_feedback(zoo):
                     return jsonify({"error": "enclosure not found in this zoo"}), 400
 
             cur.execute("""
-                INSERT INTO feedback (
+                INSERT INTO zoo.feedback (
                     zoo_id, feedback_type_id, contributor_id, status,
                     enclosure_id,
                     value_time, value_latitude, value_longitude,

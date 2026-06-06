@@ -58,9 +58,15 @@ def list_media(entity_type, entity_id):
     if entity_type not in ENTITY_TABLE_MAP:
         return jsonify({"error": "Invalid entity_type"}), 400
 
-    zoo = request.args.get("zoo", "")
-    user_id, err = require_zoo_access(zoo, 'read')
-    if err: return err
+    from helpers.authz import require_authenticated
+    if entity_type == "species":
+        user_id, err = require_authenticated()
+        if err: return err
+        zoo = ""
+    else:
+        zoo = request.args.get("zoo", "")
+        user_id, err = require_zoo_access(zoo, 'read')
+        if err: return err
 
     conn = None
     try:
