@@ -70,7 +70,7 @@ def publish_zoo(zoo):
                    details={"zoo_slug": zoo})
 
         try:
-            script_path = os.path.join(os.path.expanduser("~"), "tools", "export_sqlite.py")
+            script_path = os.path.join(os.path.dirname(__file__), "..", "tools", "export_sqlite.py")
             venv_python = os.path.join(os.path.expanduser("~"), "api", "venv", "bin", "python3")
 
             result = subprocess.run(
