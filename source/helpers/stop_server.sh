@@ -1,20 +1,11 @@
 #!/usr/bin/env bash
-
 set -euo pipefail
 
-PID_FILE="logs/gunicorn.pid"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
-if [ ! -f "$PID_FILE" ]; then
-    echo "PID file not found."
-    exit 1
-fi
-
-PID=$(cat "$PID_FILE")
-
-if kill "$PID" 2>/dev/null; then
-    rm -f "$PID_FILE"
-    echo "Killed OpenZooData server process (PID $PID)."
+if pkill -f "gunicorn.*app:app"; then
+    echo "OpenZooData Gunicorn stopped."
+    rm -f "$ROOT_DIR/logs/gunicorn.pid"
 else
-    echo "Process $PID is not running."
-    rm -f "$PID_FILE"
+    echo "No Gunicorn process found."
 fi
