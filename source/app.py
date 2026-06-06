@@ -41,6 +41,7 @@ from routes.publish    import publish_bp
 from routes.media      import media_bp
 from routes.feedback   import feedback_bp
 from routes.feed       import feed_bp
+from routes.admin      import admin_bp
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(app_auth_bp)
@@ -52,7 +53,7 @@ app.register_blueprint(publish_bp)
 app.register_blueprint(media_bp)
 app.register_blueprint(feedback_bp)
 app.register_blueprint(feed_bp)
-
+app.register_blueprint(admin_bp)
 
 @app.route("/")
 def root():

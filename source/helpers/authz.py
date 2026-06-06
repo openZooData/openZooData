@@ -150,9 +150,15 @@ def require_super_admin():
     try:
         conn = get_auth_connection()
         with conn.cursor() as cur:
+            # Prüft is_active UND super_admin-Rolle in einem Query.
+            # Deaktivierte User werden auch mit altem gültigem JWT abgewiesen.
             cur.execute("""
-                SELECT 1 FROM auth.user_global_roles
-                WHERE user_id = %s AND role = 'super_admin'
+                SELECT 1
+                FROM auth.user_global_roles ugr
+                JOIN auth.users u ON u.id = ugr.user_id
+                WHERE ugr.user_id = %s
+                  AND ugr.role = 'super_admin'
+                  AND u.is_active = TRUE
             """, (user_id,))
             if cur.fetchone():
                 return user_id, None
@@ -166,6 +172,13 @@ def require_super_admin():
 
 
 def require_authenticated():
+    """
+    Prüft nur ob ein gültiges JWT vorhanden ist.
+    HINWEIS: Keine DB-Prüfung — prüft nicht ob User/Tenant aktiv ist.
+    Für Admin-Endpoints immer require_super_admin() oder _can_*() verwenden.
+    require_authenticated() ist nur für Endpoints geeignet, bei denen
+    nachgelagert can_access_zoo() oder eine andere Rechteprüfung erfolgt.
+    """
     from flask import jsonify
     user_id = get_user_id_from_token()
     if not user_id:
