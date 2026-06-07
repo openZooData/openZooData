@@ -92,6 +92,27 @@ def rbac_setup(admin_token):
     }
     h = _super_headers(admin_token)
 
+    # ── Pre-Cleanup: Reste aus fehlgeschlagenen Läufen entfernen ────────────
+    # Idempotent — kein Fehler wenn nichts zu löschen ist.
+    for zoo_slug in ["rbac_zoo_a", "rbac_zoo_b"]:
+        requests.delete(f"{BASE_URL}/api/v1/admin/zoos/{zoo_slug}", headers=h)
+
+    # Alle RBAC-Test-User via API deaktivieren
+    r = requests.get(f"{BASE_URL}/api/v1/admin/users", headers=h)
+    if r.status_code == 200:
+        for user in r.json():
+            if user.get("email", "").endswith("@rbac.test"):
+                requests.delete(
+                    f"{BASE_URL}/api/v1/admin/users/{user['id']}", headers=h)
+
+    # Alle RBAC-Tenants deaktivieren
+    r = requests.get(f"{BASE_URL}/api/v1/admin/tenants", headers=h)
+    if r.status_code == 200:
+        for tenant in r.json():
+            if tenant.get("name", "").startswith("RBAC "):
+                requests.delete(
+                    f"{BASE_URL}/api/v1/admin/tenants/{tenant['id']}", headers=h)
+
     try:
         # ── Tenants anlegen ──────────────────────────────────────────────────
         r = requests.post(f"{BASE_URL}/api/v1/admin/tenants",
