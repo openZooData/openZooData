@@ -1977,13 +1977,17 @@ def cleanup_rbac_fixtures():
             """)
             rbac_tenant_ids = [r[0] for r in cur.fetchall()]
 
-            # 3. tenant_zoos aufräumen
+            # 3. tenant_zoos aufräumen — nach Tenant-ID UND nach Zoo-ID
+            #    Beide Wege nötig: Tenants könnten bereits gelöscht sein
+            #    aber tenant_zoos Einträge noch vorhanden (verwaist)
             if rbac_tenant_ids:
                 cur.execute("""
                     DELETE FROM auth.tenant_zoos
                     WHERE tenant_id = ANY(%s)
                 """, (rbac_tenant_ids,))
-                deleted["tenant_zoos"] = cur.rowcount
+            # Zusätzlich: verwaiste Einträge für RBAC-Zoos direkt löschen
+            # zoo_ids aus Zoo-DB ermitteln (separate Verbindung nach dem Auth-Block)
+            deleted["tenant_zoos_by_tenant"] = cur.rowcount
 
             # 4. user_zoo_roles aufräumen
             if rbac_user_ids:
@@ -2031,15 +2035,34 @@ def cleanup_rbac_fixtures():
 
         auth_conn.commit()
 
-        # 10. Zoos deaktivieren (Zoo-DB)
+        # 10. Zoos deaktivieren (Zoo-DB) + verwaiste tenant_zoos aufräumen
         zoo_conn = get_pg_connection()
         with zoo_conn.cursor() as cur:
+            cur.execute("""
+                SELECT id FROM zoo.zoos
+                WHERE slug IN ('rbac_zoo_a', 'rbac_zoo_b')
+            """)
+            rbac_zoo_ids = [r[0] for r in cur.fetchall()]
             cur.execute("""
                 UPDATE zoo.zoos SET is_active = FALSE, archived_at = NOW()
                 WHERE slug IN ('rbac_zoo_a', 'rbac_zoo_b')
             """)
             deleted["zoos_deactivated"] = cur.rowcount
         zoo_conn.commit()
+
+        # Verwaiste tenant_zoos nach Zoo-ID löschen (Auth-DB)
+        if rbac_zoo_ids:
+            auth_conn2 = get_auth_connection()
+            try:
+                with auth_conn2.cursor() as cur:
+                    cur.execute("""
+                        DELETE FROM auth.tenant_zoos
+                        WHERE zoo_id = ANY(%s)
+                    """, (rbac_zoo_ids,))
+                    deleted["tenant_zoos_by_zoo"] = cur.rowcount
+                auth_conn2.commit()
+            finally:
+                auth_conn2.close()
 
         log_action("test_fixtures_rbac_cleanup", actor_user_id=actor_id,
                    details=deleted)
