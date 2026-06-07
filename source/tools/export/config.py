@@ -10,13 +10,18 @@ from typing import Dict
 
 def load_env() -> Dict[str, str]:
     env = {}
-    for path in [Path(".env"), Path.home() / ".env"]:
+    for path in [
+        Path(".env"),
+        Path.home() / ".env",
+        Path.home() / "api" / "openZooData" / ".env",  # ← neu
+        Path(__file__).parent.parent.parent.parent / ".env",  # ← relativ
+    ]:
         if path.exists():
             for line in path.read_text().splitlines():
                 line = line.strip()
                 if line and not line.startswith("#") and "=" in line:
                     k, v = line.split("=", 1)
-                    env[k.strip()] = v.strip()
+                    env[k.strip()] = v.strip().strip("'\"")  # ← Quotes entfernen
             break
     return env
 
