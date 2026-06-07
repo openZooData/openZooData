@@ -231,23 +231,35 @@ def rbac_setup(admin_token):
         yield ctx
 
     finally:
-        # ── Cleanup — immer ausführen ────────────────────────────────────────
+        # ── Cleanup — immer ausführen, gleiche Reihenfolge wie Pre-Cleanup ──
+        # 1. Zoo-Zuordnungen zuerst aufheben
+        for tenant_key in ["tenant_a_id", "tenant_b_id", "tenant_inactive_id"]:
+            tid = ctx.get(tenant_key)
+            if tid:
+                for zoo_slug in ["rbac_zoo_a", "rbac_zoo_b"]:
+                    requests.delete(
+                        f"{BASE_URL}/api/v1/admin/tenants/{tid}/zoos/{zoo_slug}",
+                        headers=h)
+
+        # 2. Tenants deaktivieren
+        for tenant_key in ["tenant_a_id", "tenant_b_id", "tenant_inactive_id"]:
+            tid = ctx.get(tenant_key)
+            if tid:
+                requests.delete(f"{BASE_URL}/api/v1/admin/tenants/{tid}",
+                                headers=h)
+
+        # 3. Zoos deaktivieren
+        for zoo_slug in ["rbac_zoo_a", "rbac_zoo_b"]:
+            requests.delete(f"{BASE_URL}/api/v1/admin/zoos/{zoo_slug}",
+                            headers=h)
+
+        # 4. User deaktivieren
         for user_key in ["user_viewer_id", "user_editor_id",
                          "user_zoo_admin_id", "user_tenant_b_id",
                          "user_inactive_tenant_id"]:
             uid = ctx.get(user_key)
             if uid:
                 requests.delete(f"{BASE_URL}/api/v1/admin/users/{uid}",
-                                headers=h)
-
-        for zoo_slug in ["rbac_zoo_a", "rbac_zoo_b"]:
-            requests.delete(f"{BASE_URL}/api/v1/admin/zoos/{zoo_slug}",
-                            headers=h)
-
-        for tenant_key in ["tenant_a_id", "tenant_b_id", "tenant_inactive_id"]:
-            tid = ctx.get(tenant_key)
-            if tid:
-                requests.delete(f"{BASE_URL}/api/v1/admin/tenants/{tid}",
                                 headers=h)
 
 
