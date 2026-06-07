@@ -43,18 +43,17 @@ def list_zoos():
         pg = get_pg_connection()
         with pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
-                SELECT z.id, z.slug, z.name, z.city, z.country,
-                       z.url, z.description,
-                       z.top_left_latitude,    z.top_left_longitude,
-                       z.bottom_right_latitude, z.bottom_right_longitude,
-                       z.map_overlay, z.data_version,
-                       z.easy_language, z.number_animals, z.icon_url,
-                       lat.latitude, lat.longitude
-                FROM zoo.zoos z
-                LEFT JOIN zoo.zoos_lat_lng lat ON lat.zoo_id = z.id
-                WHERE z.is_active = TRUE
-                  AND z.archived_at IS NULL
-                ORDER BY z.name
+                SELECT id, slug, name, city, country,
+                       url, description,
+                       top_left_latitude,    top_left_longitude,
+                       bottom_right_latitude, bottom_right_longitude,
+                       map_overlay, data_version,
+                       easy_language, number_animals, icon_url,
+                       latitude, longitude
+                FROM zoo.zoos
+                WHERE is_active = TRUE
+                  AND archived_at IS NULL
+                ORDER BY name
             """)
             results = cur.fetchall()
         return jsonify([dict(r) for r in results]), 200
