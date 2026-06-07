@@ -24,7 +24,7 @@ LOCKOUT_MINUTES   = 30
 
 
 @auth_bp.route("/api/v1/auth/login", methods=["POST"])
-@limiter.limit("10 per minute")
+@limiter.limit("60 per minute")
 def login():
     data      = request.get_json(silent=True) or {}
     email     = data.get("email", "").strip().lower()
