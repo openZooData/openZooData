@@ -60,12 +60,14 @@ def test_zoos_list_entry_structure(base_url, jwt_headers):
         assert field in z, f"Pflichtfeld '{field}' fehlt in Zoo-Eintrag"
 
 
-@pytest.mark.jwt
-def test_zoos_list_app_token(base_url, app_token_headers):
-    """GET /api/v1/zoos mit App-Token → 200."""
+def test_zoos_list_app_token_rejected(base_url, app_token_headers):
+    """GET /api/v1/zoos mit App-Token → 403.
+    End-User-App hat keinen Zugriff auf die API — nur JWT (Backend-User).
+    End-User-App nutzt ausschließlich GET /db/<zoo> (SQLite-Download).
+    """
     resp = requests.get(f"{base_url}/api/v1/zoos", headers=app_token_headers)
-    assert resp.status_code == 200, \
-        f"Zoo-Liste mit App-Token sollte funktionieren, got {resp.status_code}"
+    assert resp.status_code == 403, \
+        f"App-Token darf keine Zoo-Liste abrufen, got {resp.status_code}"
 
 
 ###############################################################################
