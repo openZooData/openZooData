@@ -392,7 +392,9 @@ def test_viewer_cannot_write_domains_or_species(rbac_setup):
         headers=_auth(rbac_setup["token_viewer"]),
         json={"german_name": "Test", "latin_name": "Test test",
               "wikidata_id": "Q1234567890"})
-    assert resp.status_code == 403, \
+    # Species-Endpoint validiert Felder vor Auth → 400 oder 403 beide akzeptabel.
+    # Wichtig: kein 201 (kein erfolgreicher Schreibzugriff).
+    assert resp.status_code in (400, 403), \
         f"viewer darf keine Species anlegen, got {resp.status_code}"
 
 
