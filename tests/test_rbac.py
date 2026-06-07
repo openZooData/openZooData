@@ -183,20 +183,20 @@ def rbac_setup(admin_token):
         _grant_zoo_role(ctx["user_zoo_admin_id"],"rbac_zoo_a", "zoo_admin")
         _grant_zoo_role(ctx["user_tenant_b_id"], "rbac_zoo_b", "zoo_admin")
 
-        # Tenant C jetzt deaktivieren (User hat noch aktive Rolle)
-        r = requests.delete(
-            f"{BASE_URL}/api/v1/admin/tenants/{ctx['tenant_inactive_id']}",
-            headers=h)
-        assert r.status_code == 200, f"Tenant C deaktivieren: {r.text}"
-
-        # ── Login für alle User ──────────────────────────────────────────────
+        # ── Login für alle User VOR Tenant-Deaktivierung ───────────────────
         ctx["token_viewer"]    = _login(ctx["viewer_email"],    RBAC_PASSWORD)
         ctx["token_editor"]    = _login(ctx["editor_email"],    RBAC_PASSWORD)
         ctx["token_zoo_admin"] = _login(ctx["zoo_admin_email"], RBAC_PASSWORD)
         ctx["token_tenant_b"]  = _login(ctx["tenant_b_email"],  RBAC_PASSWORD)
-        # inactive_tenant User kann sich noch einloggen (User aktiv, Tenant nicht)
+        # Token VOR Deaktivierung holen — danach wäre Login nicht mehr möglich
         ctx["token_inactive_tenant"] = _login(
             ctx["inactive_tenant_email"], RBAC_PASSWORD)
+
+        # Tenant C jetzt deaktivieren — Token ist bereits gesichert
+        r = requests.delete(
+            f"{BASE_URL}/api/v1/admin/tenants/{ctx['tenant_inactive_id']}",
+            headers=h)
+        assert r.status_code == 200, f"Tenant C deaktivieren: {r.text}"
 
         yield ctx
 
