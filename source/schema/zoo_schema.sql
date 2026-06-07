@@ -2024,6 +2024,48 @@ ALTER TABLE ONLY zoo.zoo_opening_hours
     ADD CONSTRAINT zoo_opening_hours_zoo_id_fkey FOREIGN KEY (zoo_id) REFERENCES zoo.zoos(id) ON DELETE CASCADE;
 
 
+-- ============================================================================
+-- Seed-Daten: Pflichteinträge für den Betrieb
+-- ============================================================================
+
+-- ── Feedback-Typen ───────────────────────────────────────────────────────────
+
+INSERT INTO zoo.feedback_types
+    (id, slug, label_de, entity_type, requires_admin_review, is_active)
+VALUES
+    (1,  'feeding_time',         'Fütterungszeit melden',          'enclosure', TRUE,  TRUE),
+    (2,  'position',             'Position korrigieren',           'enclosure', TRUE,  TRUE),
+    (3,  'new_species_wikidata', 'Neues Tier (Wikidata)',           'enclosure', TRUE,  TRUE),
+    (4,  'species_missing',      'Tier nicht mehr vorhanden',      'enclosure', TRUE,  TRUE),
+    (5,  'enclosure_name',       'Gehegename korrigieren',         'enclosure', TRUE,  TRUE),
+    (6,  'zoo_info',             'Zoo-Information korrigieren',    'zoo',       TRUE,  TRUE),
+    (7,  'opening_hours',        'Öffnungszeiten korrigieren',     'zoo',       TRUE,  TRUE),
+    (8,  'report',               'Inhalt melden',                  'enclosure', TRUE,  TRUE),
+    (9,  'text_helpful',         'Text hilfreich',                 'species',   FALSE, TRUE),
+    (10, 'text_not_helpful',     'Text nicht hilfreich',           'species',   FALSE, TRUE)
+ON CONFLICT (id) DO NOTHING;
+
+SELECT setval(
+    pg_get_serial_sequence('zoo.feedback_types', 'id'),
+    GREATEST((SELECT MAX(id) FROM zoo.feedback_types), 10)
+);
+
+-- ── Feedback-Report-Reasons (für Typ 8 "report") ─────────────────────────────
+
+INSERT INTO zoo.feedback_report_reasons
+    (id, slug, label_de)
+VALUES
+    (1, 'incorrect_info', 'Falsche Information'),
+    (2, 'offensive',      'Anstößiger Inhalt'),
+    (3, 'outdated',       'Veraltete Information'),
+    (4, 'other',          'Sonstiges')
+ON CONFLICT (id) DO NOTHING;
+
+SELECT setval(
+    pg_get_serial_sequence('zoo.feedback_report_reasons', 'id'),
+    GREATEST((SELECT MAX(id) FROM zoo.feedback_report_reasons), 4)
+);
+
 --
 -- PostgreSQL database dump complete
 --
