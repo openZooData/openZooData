@@ -105,7 +105,7 @@ def get_zoo(zoo):
 
             # Öffnungszeiten (falls vorhanden)
             cur.execute("""
-                SELECT day_of_week, time_open, time_close
+                SELECT day_of_week, open_time, close_time, valid_from, valid_until, label
                 FROM zoo.zoo_opening_hours
                 WHERE zoo_id = %s
                 ORDER BY day_of_week
