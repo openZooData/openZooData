@@ -96,7 +96,7 @@ def rbac_setup(admin_token):
     # Dedizierter Endpoint — harter DELETE, idempotent, kein Soft-Delete.
     requests.delete(f"{BASE_URL}/api/v1/admin/test-fixtures/rbac", headers=h)
     import time as _time
-    _time.sleep(0.5)
+    _time.sleep(2)
 
     try:
         # ── Tenants anlegen ──────────────────────────────────────────────────
