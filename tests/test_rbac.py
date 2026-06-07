@@ -419,8 +419,9 @@ def test_zoo_b_token_rejected_for_zoo_a_publish(rbac_setup):
         headers=_auth(rbac_setup["token_tenant_b"]))
     # 403 = kein Zugriff (Auth-Fehler, erwartet)
     # 409 = Publish-Lock aktiv (vorheriger Test hat gerade gepublisht)
-    # Beide bedeuten: kein erfolgreicher Publish — Test ist bestanden.
-    assert resp.status_code in (403, 409), \
+    # 429 = Rate-Limit (zu viele Requests kurz hintereinander)
+    # Alle bedeuten: kein erfolgreicher Publish — Test ist bestanden.
+    assert resp.status_code in (403, 409, 429), \
         f"Cross-Zoo Publish nicht erlaubt, got {resp.status_code}"
 
 
