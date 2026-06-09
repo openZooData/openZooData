@@ -71,7 +71,8 @@ def publish_zoo(zoo):
 
         try:
             script_path = os.path.join(os.path.dirname(__file__), "..", "tools", "export_sqlite.py")
-            venv_python = os.path.join(os.path.expanduser("~"), "api", "venv", "bin", "python3")
+            import sys
+            venv_python = sys.executable
 
             result = subprocess.run(
                 [venv_python, script_path, "--zoo", zoo],

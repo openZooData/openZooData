@@ -390,3 +390,409 @@ def get_zoo_species(zoo):
         return jsonify({"error": "Internal server error"}), 500
     finally:
         if pg: pg.close()
+
+
+###############################################################################
+# ── Domains GET ───────────────────────────────────────────────────────────────
+###############################################################################
+
+@zoos_bp.route("/api/v1/zoos/<zoo>/domains", methods=["GET"])
+@limiter.limit("60 per minute")
+def get_domains(zoo):
+    """Alle Domains eines Zoos (zoo-spezifisch + global)."""
+    if not is_valid_slug(zoo):
+        return jsonify({"error": "Invalid zoo identifier"}), 400
+    user_id, err = require_zoo_access(zoo, "read")
+    if err: return err
+
+    pg = None
+    try:
+        pg = get_pg_connection()
+        with pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT d.id, d.name, d.is_infrastructure, d.sort_order,
+                       d.color_red, d.color_green, d.color_blue, d.color_alpha,
+                       d.zoo_id
+                FROM zoo.domains d
+                LEFT JOIN zoo.zoos z ON z.id = d.zoo_id
+                WHERE d.zoo_id IS NULL OR z.slug = %s
+                ORDER BY d.is_infrastructure DESC, d.sort_order, d.name
+            """, (zoo,))
+            results = cur.fetchall()
+        return jsonify([dict(r) for r in results]), 200
+    except Exception:
+        logging.exception(f"Exception in GET /api/v1/zoos/{zoo}/domains")
+        return jsonify({"error": "Internal server error"}), 500
+    finally:
+        if pg: pg.close()
+
+
+@zoos_bp.route("/api/v1/zoos/<zoo>/domains/<int:domain_id>", methods=["GET"])
+@limiter.limit("60 per minute")
+def get_domain(zoo, domain_id):
+    """Einzelne Domain."""
+    if not is_valid_slug(zoo):
+        return jsonify({"error": "Invalid zoo identifier"}), 400
+    user_id, err = require_zoo_access(zoo, "read")
+    if err: return err
+
+    pg = None
+    try:
+        pg = get_pg_connection()
+        with pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT d.id, d.name, d.is_infrastructure, d.sort_order,
+                       d.color_red, d.color_green, d.color_blue, d.color_alpha,
+                       d.zoo_id
+                FROM zoo.domains d
+                LEFT JOIN zoo.zoos z ON z.id = d.zoo_id
+                WHERE d.id = %s
+                  AND (d.zoo_id IS NULL OR z.slug = %s)
+            """, (domain_id, zoo))
+            row = cur.fetchone()
+            if not row:
+                return jsonify({"error": "Domain not found"}), 404
+        return jsonify(dict(row)), 200
+    except Exception:
+        logging.exception(f"Exception in GET /api/v1/zoos/{zoo}/domains/{domain_id}")
+        return jsonify({"error": "Internal server error"}), 500
+    finally:
+        if pg: pg.close()
+
+###############################################################################
+# ── Domains CRUD ──────────────────────────────────────────────────────────────
+###############################################################################
+
+@zoos_bp.route("/api/v1/zoos/<zoo>/domains", methods=["POST"])
+@limiter.limit("30 per minute")
+def create_domain(zoo):
+    """Domain anlegen. Body: { name, is_infrastructure, sort_order, color_red, color_green, color_blue, color_alpha }"""
+    if not is_valid_slug(zoo):
+        return jsonify({"error": "Invalid zoo identifier"}), 400
+    user_id, err = require_zoo_access(zoo, "write")
+    if err: return err
+
+    data = request.get_json(silent=True) or {}
+    name = data.get("name", "").strip()
+    if not name:
+        return jsonify({"error": "name required"}), 400
+    if len(name) > 200:
+        return jsonify({"error": "name must be at most 200 characters"}), 400
+
+    pg = None
+    try:
+        pg = get_pg_connection()
+        with pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT id FROM zoo.zoos WHERE slug = %s", (zoo,))
+            zoo_row = cur.fetchone()
+            if not zoo_row:
+                return jsonify({"error": "Zoo not found"}), 404
+
+            cur.execute("""
+                INSERT INTO zoo.domains
+                    (zoo_id, name, is_infrastructure, sort_order,
+                     color_red, color_green, color_blue, color_alpha)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+            """, (
+                zoo_row["id"], name,
+                data.get("is_infrastructure", False),
+                data.get("sort_order", 0),
+                data.get("color_red", 128),
+                data.get("color_green", 128),
+                data.get("color_blue", 128),
+                data.get("color_alpha", 1.0),
+            ))
+            domain_id = cur.fetchone()["id"]
+        pg.commit()
+        return jsonify({"id": domain_id, "message": "Created"}), 201
+    except Exception:
+        logging.exception(f"Exception in POST /api/v1/zoos/{zoo}/domains")
+        return jsonify({"error": "Internal server error"}), 500
+    finally:
+        if pg: pg.close()
+
+
+@zoos_bp.route("/api/v1/zoos/<zoo>/domains/<int:domain_id>", methods=["PUT"])
+@limiter.limit("30 per minute")
+def update_domain(zoo, domain_id):
+    """Domain bearbeiten."""
+    if not is_valid_slug(zoo):
+        return jsonify({"error": "Invalid zoo identifier"}), 400
+    user_id, err = require_zoo_access(zoo, "write")
+    if err: return err
+
+    data = request.get_json(silent=True) or {}
+    ALLOWED = {"name", "is_infrastructure", "sort_order",
+               "color_red", "color_green", "color_blue", "color_alpha"}
+    unknown = set(data.keys()) - ALLOWED
+    if unknown:
+        return jsonify({"error": f"Unknown fields: {', '.join(sorted(unknown))}"}), 400
+    if not data:
+        return jsonify({"error": "No fields to update"}), 400
+    if "name" in data:
+        if not str(data["name"]).strip():
+            return jsonify({"error": "name must not be empty"}), 400
+        if len(str(data["name"])) > 200:
+            return jsonify({"error": "name must be at most 200 characters"}), 400
+
+    set_clauses = ", ".join(f"{k} = %s" for k in data)
+    values = list(data.values()) + [domain_id, zoo]
+
+    pg = None
+    try:
+        pg = get_pg_connection()
+        with pg.cursor() as cur:
+            cur.execute(f"""
+                UPDATE zoo.domains SET {set_clauses}
+                WHERE id = %s
+                  AND zoo_id = (SELECT id FROM zoo.zoos WHERE slug = %s)
+                RETURNING id
+            """, values)
+            if not cur.fetchone():
+                return jsonify({"error": "Domain not found"}), 404
+        pg.commit()
+        return jsonify({"message": "Updated"}), 200
+    except Exception:
+        logging.exception(f"Exception in PUT /api/v1/zoos/{zoo}/domains/{domain_id}")
+        return jsonify({"error": "Internal server error"}), 500
+    finally:
+        if pg: pg.close()
+
+
+@zoos_bp.route("/api/v1/zoos/<zoo>/domains/<int:domain_id>", methods=["DELETE"])
+@limiter.limit("10 per minute")
+def delete_domain(zoo, domain_id):
+    """Domain löschen."""
+    if not is_valid_slug(zoo):
+        return jsonify({"error": "Invalid zoo identifier"}), 400
+    user_id, err = require_zoo_access(zoo, "write")
+    if err: return err
+
+    pg = None
+    try:
+        pg = get_pg_connection()
+        with pg.cursor() as cur:
+            cur.execute("""
+                DELETE FROM zoo.domains
+                WHERE id = %s
+                  AND zoo_id = (SELECT id FROM zoo.zoos WHERE slug = %s)
+            """, (domain_id, zoo))
+            if cur.rowcount == 0:
+                return jsonify({"error": "Domain not found"}), 404
+        pg.commit()
+        return jsonify({"message": "Deleted"}), 200
+    except Exception:
+        logging.exception(f"Exception in DELETE /api/v1/zoos/{zoo}/domains/{domain_id}")
+        return jsonify({"error": "Internal server error"}), 500
+    finally:
+        if pg: pg.close()
+
+
+###############################################################################
+# ── Locations CRUD ────────────────────────────────────────────────────────────
+###############################################################################
+
+@zoos_bp.route("/api/v1/zoos/<zoo>/locations", methods=["GET"])
+@limiter.limit("60 per minute")
+def get_locations(zoo):
+    """Alle Infrastruktur-POIs eines Zoos (Toilette, Restaurant, Spielplatz, …)."""
+    if not is_valid_slug(zoo):
+        return jsonify({"error": "Invalid zoo identifier"}), 400
+    user_id, err = require_zoo_access(zoo, "read")
+    if err: return err
+
+    pg = None
+    try:
+        pg = get_pg_connection()
+        with pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT l.id, l.name, l.name_display, l.description,
+                       l.location_type, l.sort_order, l.domain_id,
+                       l.url, l.description_long,
+                       d.name AS domain_name
+                FROM zoo.locations l
+                JOIN zoo.zoos z ON z.id = l.zoo_id
+                LEFT JOIN zoo.domains d ON d.id = l.domain_id
+                WHERE z.slug = %s
+                ORDER BY l.sort_order, l.name
+            """, (zoo,))
+            results = cur.fetchall()
+        return jsonify([dict(r) for r in results]), 200
+    except Exception:
+        logging.exception(f"Exception in GET /api/v1/zoos/{zoo}/locations")
+        return jsonify({"error": "Internal server error"}), 500
+    finally:
+        if pg: pg.close()
+
+
+@zoos_bp.route("/api/v1/zoos/<zoo>/locations/<int:location_id>", methods=["GET"])
+@limiter.limit("60 per minute")
+def get_location(zoo, location_id):
+    """Einzelner Infrastruktur-POI inkl. Öffnungszeiten."""
+    if not is_valid_slug(zoo):
+        return jsonify({"error": "Invalid zoo identifier"}), 400
+    user_id, err = require_zoo_access(zoo, "read")
+    if err: return err
+
+    pg = None
+    try:
+        pg = get_pg_connection()
+        with pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT l.id, l.name, l.name_display, l.description,
+                       l.location_type, l.sort_order, l.domain_id,
+                       l.url, l.description_long
+                FROM zoo.locations l
+                JOIN zoo.zoos z ON z.id = l.zoo_id
+                WHERE l.id = %s AND z.slug = %s
+            """, (location_id, zoo))
+            loc = cur.fetchone()
+            if not loc:
+                return jsonify({"error": "Location not found"}), 404
+            loc = dict(loc)
+
+            # Öffnungszeiten
+            cur.execute("""
+                SELECT day_of_week, open_time, close_time, valid_from, valid_until, label
+                FROM zoo.opening_hours
+                WHERE location_id = %s
+                ORDER BY day_of_week
+            """, (location_id,))
+            loc["opening_hours"] = [dict(r) for r in cur.fetchall()]
+
+        return jsonify(loc), 200
+    except Exception:
+        logging.exception(f"Exception in GET /api/v1/zoos/{zoo}/locations/{location_id}")
+        return jsonify({"error": "Internal server error"}), 500
+    finally:
+        if pg: pg.close()
+
+
+@zoos_bp.route("/api/v1/zoos/<zoo>/locations", methods=["POST"])
+@limiter.limit("30 per minute")
+def create_location(zoo):
+    """
+    Infrastruktur-POI anlegen.
+    Body: { name, name_display, description, location_type, sort_order,
+            domain_id, url, description_long }
+    """
+    if not is_valid_slug(zoo):
+        return jsonify({"error": "Invalid zoo identifier"}), 400
+    user_id, err = require_zoo_access(zoo, "write")
+    if err: return err
+
+    data = request.get_json(silent=True) or {}
+    name = data.get("name", "").strip()
+    if not name:
+        return jsonify({"error": "name required"}), 400
+    if len(name) > 200:
+        return jsonify({"error": "name must be at most 200 characters"}), 400
+
+    pg = None
+    try:
+        pg = get_pg_connection()
+        with pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT id FROM zoo.zoos WHERE slug = %s", (zoo,))
+            zoo_row = cur.fetchone()
+            if not zoo_row:
+                return jsonify({"error": "Zoo not found"}), 404
+
+            cur.execute("""
+                INSERT INTO zoo.locations
+                    (zoo_id, name, name_display, description, location_type,
+                     sort_order, domain_id, url, description_long)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+            """, (
+                zoo_row["id"], name,
+                data.get("name_display") or None,
+                data.get("description") or None,
+                data.get("location_type") or None,
+                data.get("sort_order", 0),
+                data.get("domain_id") or None,
+                data.get("url") or None,
+                data.get("description_long") or None,
+            ))
+            location_id = cur.fetchone()["id"]
+        pg.commit()
+        return jsonify({"id": location_id, "message": "Created"}), 201
+    except Exception:
+        logging.exception(f"Exception in POST /api/v1/zoos/{zoo}/locations")
+        return jsonify({"error": "Internal server error"}), 500
+    finally:
+        if pg: pg.close()
+
+
+@zoos_bp.route("/api/v1/zoos/<zoo>/locations/<int:location_id>", methods=["PUT"])
+@limiter.limit("30 per minute")
+def update_location(zoo, location_id):
+    """Infrastruktur-POI bearbeiten."""
+    if not is_valid_slug(zoo):
+        return jsonify({"error": "Invalid zoo identifier"}), 400
+    user_id, err = require_zoo_access(zoo, "write")
+    if err: return err
+
+    data = request.get_json(silent=True) or {}
+    ALLOWED = {"name", "name_display", "description", "location_type",
+               "sort_order", "domain_id", "url", "description_long"}
+    unknown = set(data.keys()) - ALLOWED
+    if unknown:
+        return jsonify({"error": f"Unknown fields: {', '.join(sorted(unknown))}"}), 400
+    if not data:
+        return jsonify({"error": "No fields to update"}), 400
+    if "name" in data:
+        if not str(data["name"]).strip():
+            return jsonify({"error": "name must not be empty"}), 400
+
+    set_clauses = ", ".join(f"{k} = %s" for k in data)
+    values = list(data.values()) + [location_id, zoo]
+
+    pg = None
+    try:
+        pg = get_pg_connection()
+        with pg.cursor() as cur:
+            cur.execute(f"""
+                UPDATE zoo.locations SET {set_clauses}
+                WHERE id = %s
+                  AND zoo_id = (SELECT id FROM zoo.zoos WHERE slug = %s)
+                RETURNING id
+            """, values)
+            if not cur.fetchone():
+                return jsonify({"error": "Location not found"}), 404
+        pg.commit()
+        return jsonify({"message": "Updated"}), 200
+    except Exception:
+        logging.exception(f"Exception in PUT /api/v1/zoos/{zoo}/locations/{location_id}")
+        return jsonify({"error": "Internal server error"}), 500
+    finally:
+        if pg: pg.close()
+
+
+@zoos_bp.route("/api/v1/zoos/<zoo>/locations/<int:location_id>", methods=["DELETE"])
+@limiter.limit("10 per minute")
+def delete_location(zoo, location_id):
+    """Infrastruktur-POI löschen (inkl. Öffnungszeiten via CASCADE)."""
+    if not is_valid_slug(zoo):
+        return jsonify({"error": "Invalid zoo identifier"}), 400
+    user_id, err = require_zoo_access(zoo, "write")
+    if err: return err
+
+    pg = None
+    try:
+        pg = get_pg_connection()
+        with pg.cursor() as cur:
+            cur.execute("""
+                DELETE FROM zoo.locations
+                WHERE id = %s
+                  AND zoo_id = (SELECT id FROM zoo.zoos WHERE slug = %s)
+            """, (location_id, zoo))
+            if cur.rowcount == 0:
+                return jsonify({"error": "Location not found"}), 404
+        pg.commit()
+        return jsonify({"message": "Deleted"}), 200
+    except Exception:
+        logging.exception(f"Exception in DELETE /api/v1/zoos/{zoo}/locations/{location_id}")
+        return jsonify({"error": "Internal server error"}), 500
+    finally:
+        if pg: pg.close()

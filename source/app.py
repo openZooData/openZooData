@@ -1,14 +1,19 @@
 import os
 import logging
 import hmac
-from flask import Flask, jsonify, request
-from dotenv import load_dotenv
 from pathlib import Path
+
+# .env laden — muss als allererstes passieren
+import sys
+sys.path.insert(0, str(Path(__file__).parent))
+from helpers.env_loader import load_env
+load_env()
+
+# Jetzt erst alle anderen Imports
+from flask import Flask, jsonify, request
 from extensions import limiter
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.exceptions import HTTPException
-
-load_dotenv(Path(__file__).parent.parent / ".env")
 
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
@@ -25,7 +30,7 @@ if not HEALTH_CHECK_KEY or len(HEALTH_CHECK_KEY) < 32:
     raise RuntimeError("HEALTH_CHECK_KEY fehlt oder ist zu kurz (min. 32 Zeichen)")
 
 PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "").rstrip("/")
-if not PUBLIC_BASE_URL or not PUBLIC_BASE_URL.startswith("https://"):
+if not PUBLIC_BASE_URL or not PUBLIC_BASE_URL.startswith(("https://", "http://")):
     raise RuntimeError(
         "PUBLIC_BASE_URL fehlt oder ist ungültig. "
         "Beispiel: PUBLIC_BASE_URL=https://api.zooguide.app"

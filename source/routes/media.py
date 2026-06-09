@@ -26,6 +26,7 @@ ENTITY_TABLE_MAP = {
     "enclosure_species": "enclosure_species",
     "house":             "houses",
     "location":          "locations",
+    "domain":            "domains",
 }
 
 
@@ -58,11 +59,11 @@ def list_media(entity_type, entity_id):
     if entity_type not in ENTITY_TABLE_MAP:
         return jsonify({"error": "Invalid entity_type"}), 400
 
-    from helpers.authz import require_authenticated
     if entity_type == "species":
+        # species ist global — kein Zoo-Kontext nötig, nur Auth
+        from helpers.authz import require_authenticated
         user_id, err = require_authenticated()
         if err: return err
-        zoo = ""
     else:
         zoo = request.args.get("zoo", "")
         user_id, err = require_zoo_access(zoo, 'read')
@@ -154,7 +155,14 @@ def upload_media(entity_type, entity_id):
     if mime_type not in ALLOWED_MIME_TYPES:
         return jsonify({"error": "Invalid file type"}), 400
 
-    ext           = os.path.splitext(file.filename)[1].lower()
+    # Dateiendung strikt an MIME-Typ binden — Originalendung wird ignoriert.
+    # Verhindert dass z.B. eine .php-Datei als image/jpeg hochgeladen wird.
+    MIME_TO_EXT = {
+        "image/jpeg": ".jpg",
+        "image/png":  ".png",
+        "image/webp": ".webp",
+    }
+    ext           = MIME_TO_EXT[mime_type]
     safe_filename = f"{uuid.uuid4().hex}{ext}"
     label         = request.form.get("label")
     sort_order    = int(request.form.get("sort_order", 0) or 0)

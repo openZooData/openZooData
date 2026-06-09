@@ -1039,7 +1039,12 @@ CREATE TABLE zoo.zoos (
     number_animals integer,
     city text,
     country text DEFAULT 'DE'::text,
-    icon_url character varying(255)
+    icon_url character varying(255),
+    latitude double precision,
+    longitude double precision,
+    time_open time without time zone,
+    time_close time without time zone,
+    archived_at timestamp with time zone
 );
 
 
