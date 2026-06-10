@@ -40,7 +40,6 @@ from routes.auth       import auth_bp
 from routes.app_auth   import app_auth_bp
 from routes.species    import species_bp
 from routes.enclosures import enclosures_bp
-from routes.domains    import domains_bp
 from routes.sqlite     import sqlite_bp
 from routes.publish    import publish_bp
 from routes.media      import media_bp
@@ -53,7 +52,6 @@ app.register_blueprint(auth_bp)
 app.register_blueprint(app_auth_bp)
 app.register_blueprint(species_bp)
 app.register_blueprint(enclosures_bp)
-app.register_blueprint(domains_bp)
 app.register_blueprint(sqlite_bp)
 app.register_blueprint(publish_bp)
 app.register_blueprint(media_bp)
