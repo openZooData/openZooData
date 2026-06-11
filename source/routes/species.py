@@ -104,8 +104,18 @@ def create_species():
             """, (new_species["id"], german_name))
 
         pg.commit()
-        return jsonify(new_species), 201
-    except Exception:
+        return jsonify({
+            **new_species,
+            "message": f"Tier '{german_name}' erfolgreich angelegt"
+        }), 201
+    except Exception as e:
+        if pg:
+            pg.rollback()
+        if "unique" in str(e).lower() or "idx_species_wikidata" in str(e).lower():
+            return jsonify({
+                "error": "Tier mit dieser Wikidata-ID bereits vorhanden",
+                "code": "duplicate_wikidata_id"
+            }), 409
         logging.exception("Exception in /api/v1/species POST")
         return jsonify({"error": "Internal server error"}), 500
     finally:

@@ -23,7 +23,9 @@ def get_enclosures(zoo):
         with pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
                 SELECT e.id, e.name, e.sort_order, e.domain_id,
+                       e.house_id,
                        d.name AS domain_name,
+                       h.name AS house_name,
                        s.id AS species_id, s.german_name, s.latin_name,
                        s.wikidata_id, s.iucn_status_id,
                        es.count_adult, es.count_juvenile,
@@ -33,6 +35,7 @@ def get_enclosures(zoo):
                 FROM zoo.enclosures e
                 JOIN zoo.zoos z ON z.id = e.zoo_id
                 LEFT JOIN zoo.domains d ON d.id = e.domain_id
+                LEFT JOIN zoo.houses h ON h.id = e.house_id
                 LEFT JOIN zoo.enclosure_species es ON es.enclosure_id = e.id
                 LEFT JOIN zoo.species s ON s.id = es.species_id
                 LEFT JOIN zoo.feeding_times ft
@@ -43,7 +46,8 @@ def get_enclosures(zoo):
                       AND gp.entity_id = e.id
                 WHERE z.slug = %s
                 GROUP BY e.id, e.name, e.sort_order, e.domain_id,
-                         d.name, s.id, s.german_name, s.latin_name,
+                         e.house_id, d.name, h.name,
+                         s.id, s.german_name, s.latin_name,
                          s.wikidata_id, s.iucn_status_id,
                          es.count_adult, es.count_juvenile,
                          gp.latitude, gp.longitude
@@ -71,6 +75,7 @@ def create_enclosure(zoo):
     name          = data.get("name", "").strip()
     species_id    = data.get("species_id")
     domain_id     = data.get("domain_id")
+    house_id      = data.get("house_id")
     latitude      = data.get("latitude")
     longitude     = data.get("longitude")
     feeding_times = data.get("feeding_times", [])
@@ -100,11 +105,17 @@ def create_enclosure(zoo):
                 if not cur.fetchone():
                     return jsonify({"error": "Invalid domain_id"}), 400
 
+            if house_id is not None:
+                cur.execute("SELECT id FROM zoo.houses WHERE id = %s AND zoo_id = %s",
+                            (house_id, zoo_id))
+                if not cur.fetchone():
+                    return jsonify({"error": "Invalid house_id"}), 400
+
             cur.execute("""
-                INSERT INTO zoo.enclosures (zoo_id, name, domain_id)
-                VALUES (%s, %s, %s)
+                INSERT INTO zoo.enclosures (zoo_id, name, domain_id, house_id)
+                VALUES (%s, %s, %s, %s)
                 RETURNING id
-            """, (zoo_id, name, domain_id))
+            """, (zoo_id, name, domain_id, house_id))
             enclosure_id = cur.fetchone()["id"]
 
             cur.execute("""
@@ -149,6 +160,7 @@ def update_enclosure(zoo, enclosure_id):
     data          = request.get_json(silent=True) or {}
     name          = data.get("name")
     domain_id     = data.get("domain_id")
+    house_id      = data.get("house_id", -1)  # -1 = not provided
     feeding_times = data.get("feeding_times")
     latitude      = data.get("latitude")
     longitude     = data.get("longitude")
@@ -177,14 +189,15 @@ def update_enclosure(zoo, enclosure_id):
                     if not cur.fetchone():
                         return jsonify({"error": "Invalid domain_id"}), 400
 
-            if name or domain_id is not None:
+            if name or domain_id is not None or house_id != -1:
                 cur.execute("""
                     UPDATE zoo.enclosures SET
                         name      = COALESCE(%s, name),
-                        domain_id = COALESCE(%s, domain_id)
+                        domain_id = COALESCE(%s, domain_id),
+                        house_id  = CASE WHEN %s = -1 THEN house_id ELSE %s END
                     WHERE id = %s
                     AND zoo_id = (SELECT id FROM zoo.zoos WHERE slug = %s)
-                """, (name, domain_id, enclosure_id, zoo))
+                """, (name, domain_id, house_id, house_id, enclosure_id, zoo))
 
             if feeding_times is not None:
                 sid = species_id

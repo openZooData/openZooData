@@ -584,7 +584,8 @@ CREATE TABLE zoo.houses (
     description text,
     history text,
     sponsor text,
-    notes text
+    notes text,
+    domain_id integer
 );
 
 
@@ -1956,6 +1957,9 @@ ALTER TABLE ONLY zoo.house_opening_hours
 ALTER TABLE ONLY zoo.houses
     ADD CONSTRAINT houses_zoo_id_fkey FOREIGN KEY (zoo_id) REFERENCES zoo.zoos(id) ON DELETE CASCADE;
 
+ALTER TABLE ONLY zoo.houses
+    ADD CONSTRAINT houses_domain_id_fkey FOREIGN KEY (domain_id) REFERENCES zoo.domains(id) ON DELETE SET NULL;
+
 
 --
 -- Name: location_species location_species_location_id_fkey; Type: FK CONSTRAINT; Schema: zoo; Owner: -
@@ -2075,4 +2079,24 @@ SELECT setval(
 -- PostgreSQL database dump complete
 --
 
+--
+-- Data for location_types
+--
 
+INSERT INTO zoo.location_types (slug, name, icon, sort_order) VALUES
+  ('wc',                  'WC',                   'restroom',       1),
+  ('wickelraum',          'Wickelraum',            'baby-carriage',  2),
+  ('spielplatz',          'Spielplatz',            'playground',     3),
+  ('restaurant',          'Restaurant',            'fork-knife',     4),
+  ('kiosk',               'Kiosk',                 'coffee',         5),
+  ('eis',                 'Eis',                   'ice-cream',      6),
+  ('shop',                'Shop',                  'shopping-bag',   7),
+  ('eingang',             'Eingang',               'door-enter',     8),
+  ('ausgang',             'Ausgang',               'door-exit',      9),
+  ('backstube',           'Backstube',             'bread',          10),
+  ('museum',              'Museum',                'building',       11),
+  ('attraktion',          'Attraktion',            'star',           12),
+  ('service',             'Service',               'tool',           13),
+  ('aussichtsplattform',  'Aussichtsplattform',    'binoculars',     15),
+  ('behindertentoilette', 'Behindertentoilette',   'accessible',     3),
+  ('sonstiges',           'Sonstiges',             'dots',           99);

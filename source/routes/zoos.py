@@ -139,13 +139,15 @@ def get_houses(zoo):
         with pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
                 SELECT h.id, h.name, h.description, h.history,
-                       h.sponsor, h.notes,
+                       h.sponsor, h.notes, h.domain_id,
+                       d.name AS domain_name,
                        COUNT(e.id) AS enclosure_count
                 FROM zoo.houses h
                 JOIN zoo.zoos z ON z.id = h.zoo_id
+                LEFT JOIN zoo.domains d ON d.id = h.domain_id
                 LEFT JOIN zoo.enclosures e ON e.house_id = h.id
                 WHERE z.slug = %s
-                GROUP BY h.id
+                GROUP BY h.id, d.name
                 ORDER BY h.name
             """, (zoo,))
             results = cur.fetchall()
@@ -172,9 +174,11 @@ def get_house(zoo, house_id):
         with pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
                 SELECT h.id, h.name, h.description, h.history,
-                       h.sponsor, h.notes
+                       h.sponsor, h.notes, h.domain_id,
+                       d.name AS domain_name
                 FROM zoo.houses h
                 JOIN zoo.zoos z ON z.id = h.zoo_id
+                LEFT JOIN zoo.domains d ON d.id = h.domain_id
                 WHERE h.id = %s AND z.slug = %s
             """, (house_id, zoo))
             house = cur.fetchone()
@@ -194,6 +198,18 @@ def get_house(zoo, house_id):
                 ORDER BY e.sort_order, e.name
             """, (house_id,))
             house["enclosures"] = [dict(r) for r in cur.fetchall()]
+
+            # Tiere direkt im Haus (ohne Gehege)
+            cur.execute("""
+                SELECT es.id, es.species_id, es.house_id, es.enclosure_id,
+                       es.note, es.count_adult, es.count_juvenile,
+                       s.german_name, s.latin_name, s.wikidata_id, s.iucn_status_id
+                FROM zoo.enclosure_species es
+                JOIN zoo.species s ON s.id = es.species_id
+                WHERE es.house_id = %s
+                ORDER BY s.german_name
+            """, (house_id,))
+            house["species"] = [dict(r) for r in cur.fetchall()]
 
         return jsonify(house), 200
     except Exception:
@@ -218,6 +234,7 @@ def create_house(zoo):
     history     = data.get("history", "").strip() or None
     sponsor     = data.get("sponsor", "").strip() or None
     notes       = data.get("notes", "").strip() or None
+    domain_id   = data.get("domain_id") or None
 
     if not name:
         return jsonify({"error": "name required"}), 400
@@ -234,10 +251,10 @@ def create_house(zoo):
                 return jsonify({"error": "Zoo not found"}), 404
 
             cur.execute("""
-                INSERT INTO zoo.houses (zoo_id, name, description, history, sponsor, notes)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                INSERT INTO zoo.houses (zoo_id, name, description, history, sponsor, notes, domain_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
-            """, (zoo_row["id"], name, description, history, sponsor, notes))
+            """, (zoo_row["id"], name, description, history, sponsor, notes, domain_id))
             house_id = cur.fetchone()["id"]
         pg.commit()
         return jsonify({"id": house_id, "message": "Created"}), 201
@@ -258,7 +275,7 @@ def update_house(zoo, house_id):
     if err: return err
 
     data = request.get_json(silent=True) or {}
-    ALLOWED = {"name", "description", "history", "sponsor", "notes"}
+    ALLOWED = {"name", "description", "history", "sponsor", "notes", "domain_id"}
     unknown = set(data.keys()) - ALLOWED
     if unknown:
         return jsonify({"error": f"Unknown fields: {', '.join(sorted(unknown))}"}), 400
@@ -346,8 +363,10 @@ def get_zoo_species(zoo):
     domain_id = request.args.get("domain_id")
     search    = request.args.get("search", "").strip()
 
-    conditions = ["z.slug = %s"]
-    params     = [zoo]
+    # Species sind global — alle Species zurückgeben.
+    # enclosure_count zeigt wie viele Gehege dieses Zoos die Art halten.
+    conditions = []
+    params     = [zoo]  # Zoo-Slug für enclosure_count
 
     if domain_id:
         try:
@@ -363,23 +382,23 @@ def get_zoo_species(zoo):
         )
         params.extend([f"%{search}%", f"%{search}%"])
 
-    where = " AND ".join(conditions)
+    where_extra = ("AND " + " AND ".join(conditions)) if conditions else ""
 
     pg = None
     try:
         pg = get_pg_connection()
         with pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(f"""
-                SELECT DISTINCT
+                SELECT
                     s.id, s.wikidata_id, s.german_name, s.latin_name,
                     s.iucn_status_id, s.iucn_id, s.gbif_taxon_key,
                     s.iucn_population_trend_id, s.id_valid,
                     COUNT(DISTINCT e.id) AS enclosure_count
                 FROM zoo.species s
-                JOIN zoo.enclosure_species es ON es.species_id = s.id
-                JOIN zoo.enclosures e ON e.id = es.enclosure_id
-                JOIN zoo.zoos z ON z.id = e.zoo_id
-                WHERE {where}
+                LEFT JOIN zoo.enclosure_species es ON es.species_id = s.id
+                LEFT JOIN zoo.enclosures e ON e.id = es.enclosure_id
+                    AND e.zoo_id = (SELECT id FROM zoo.zoos WHERE slug = %s)
+                {where_extra}
                 GROUP BY s.id
                 ORDER BY s.german_name
             """, params)
@@ -608,12 +627,14 @@ def get_locations(zoo):
         with pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
                 SELECT l.id, l.name, l.name_display, l.description,
-                       l.location_type, l.sort_order, l.domain_id,
+                       l.location_type, l.location_type_id, l.sort_order, l.domain_id,
                        l.url, l.description_long,
-                       d.name AS domain_name
+                       d.name AS domain_name,
+                       lt.name AS location_type_name, lt.icon AS location_type_icon
                 FROM zoo.locations l
                 JOIN zoo.zoos z ON z.id = l.zoo_id
                 LEFT JOIN zoo.domains d ON d.id = l.domain_id
+                LEFT JOIN zoo.location_types lt ON lt.id = l.location_type_id
                 WHERE z.slug = %s
                 ORDER BY l.sort_order, l.name
             """, (zoo,))
@@ -641,10 +662,12 @@ def get_location(zoo, location_id):
         with pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
                 SELECT l.id, l.name, l.name_display, l.description,
-                       l.location_type, l.sort_order, l.domain_id,
-                       l.url, l.description_long
+                       l.location_type, l.location_type_id, l.sort_order, l.domain_id,
+                       l.url, l.description_long,
+                       lt.name AS location_type_name, lt.icon AS location_type_icon
                 FROM zoo.locations l
                 JOIN zoo.zoos z ON z.id = l.zoo_id
+                LEFT JOIN zoo.location_types lt ON lt.id = l.location_type_id
                 WHERE l.id = %s AND z.slug = %s
             """, (location_id, zoo))
             loc = cur.fetchone()
@@ -654,7 +677,7 @@ def get_location(zoo, location_id):
 
             # Öffnungszeiten
             cur.execute("""
-                SELECT day_of_week, open_time, close_time, valid_from, valid_until, label
+                SELECT day_of_week, open_offset, close_offset
                 FROM zoo.opening_hours
                 WHERE location_id = %s
                 ORDER BY day_of_week
@@ -701,14 +724,15 @@ def create_location(zoo):
             cur.execute("""
                 INSERT INTO zoo.locations
                     (zoo_id, name, name_display, description, location_type,
-                     sort_order, domain_id, url, description_long)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     location_type_id, sort_order, domain_id, url, description_long)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
             """, (
                 zoo_row["id"], name,
                 data.get("name_display") or None,
                 data.get("description") or None,
                 data.get("location_type") or None,
+                data.get("location_type_id") or None,
                 data.get("sort_order", 0),
                 data.get("domain_id") or None,
                 data.get("url") or None,
@@ -735,7 +759,7 @@ def update_location(zoo, location_id):
 
     data = request.get_json(silent=True) or {}
     ALLOWED = {"name", "name_display", "description", "location_type",
-               "sort_order", "domain_id", "url", "description_long"}
+               "location_type_id", "sort_order", "domain_id", "url", "description_long"}
     unknown = set(data.keys()) - ALLOWED
     if unknown:
         return jsonify({"error": f"Unknown fields: {', '.join(sorted(unknown))}"}), 400
