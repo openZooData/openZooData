@@ -290,13 +290,14 @@ ALTER SEQUENCE zoo.domains_id_seq OWNED BY zoo.domains.id;
 --
 
 CREATE TABLE zoo.enclosure_species (
-    enclosure_id integer NOT NULL,
+    enclosure_id integer,
     species_id integer NOT NULL,
     note text,
     count_adult smallint,
     count_juvenile smallint,
     counted_at timestamp with time zone,
-    id integer NOT NULL
+    id integer NOT NULL,
+    house_id integer
 );
 
 
@@ -1845,6 +1846,9 @@ ALTER TABLE ONLY zoo.domains
 ALTER TABLE ONLY zoo.enclosure_species
     ADD CONSTRAINT enclosure_species_enclosure_id_fkey FOREIGN KEY (enclosure_id) REFERENCES zoo.enclosures(id) ON DELETE CASCADE;
 
+ALTER TABLE ONLY zoo.enclosure_species
+    ADD CONSTRAINT enclosure_species_house_id_fkey FOREIGN KEY (house_id) REFERENCES zoo.houses(id) ON DELETE SET NULL;
+
 
 --
 -- Name: enclosure_species enclosure_species_species_id_fkey; Type: FK CONSTRAINT; Schema: zoo; Owner: -
@@ -2100,3 +2104,5 @@ INSERT INTO zoo.location_types (slug, name, icon, sort_order) VALUES
   ('aussichtsplattform',  'Aussichtsplattform',    'binoculars',     15),
   ('behindertentoilette', 'Behindertentoilette',   'accessible',     3),
   ('sonstiges',           'Sonstiges',             'dots',           99);
+
+CREATE UNIQUE INDEX uq_geo_points_entity ON zoo.geo_points (entity_type, entity_id);

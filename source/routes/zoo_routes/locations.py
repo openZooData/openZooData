@@ -3,7 +3,7 @@ import psycopg2.extras
 from flask import Blueprint, jsonify, request
 from db import get_pg_connection
 from extensions import limiter
-from helpers.coordinates import is_valid_slug
+from helpers.coordinates import is_valid_slug, round_coordinates
 from helpers.authz import require_zoo_access
 
 locations_bp = Blueprint("locations_bp", __name__)
@@ -26,11 +26,13 @@ def get_locations(zoo):
                        l.location_type, l.location_type_id, l.sort_order, l.domain_id,
                        l.url, l.description_long,
                        d.name AS domain_name,
-                       lt.name AS location_type_name, lt.icon AS location_type_icon
+                       lt.name AS location_type_name, lt.icon AS location_type_icon,
+                       gp.latitude, gp.longitude
                 FROM zoo.locations l
                 JOIN zoo.zoos z ON z.id = l.zoo_id
                 LEFT JOIN zoo.domains d ON d.id = l.domain_id
                 LEFT JOIN zoo.location_types lt ON lt.id = l.location_type_id
+                LEFT JOIN zoo.geo_points gp ON gp.entity_type = 'location' AND gp.entity_id = l.id
                 WHERE z.slug = %s
                 ORDER BY l.sort_order, l.name
             """, (zoo,))
@@ -60,10 +62,12 @@ def get_location(zoo, location_id):
                 SELECT l.id, l.name, l.name_display, l.description,
                        l.location_type, l.location_type_id, l.sort_order, l.domain_id,
                        l.url, l.description_long,
-                       lt.name AS location_type_name, lt.icon AS location_type_icon
+                       lt.name AS location_type_name, lt.icon AS location_type_icon,
+                       gp.latitude, gp.longitude
                 FROM zoo.locations l
                 JOIN zoo.zoos z ON z.id = l.zoo_id
                 LEFT JOIN zoo.location_types lt ON lt.id = l.location_type_id
+                LEFT JOIN zoo.geo_points gp ON gp.entity_type = 'location' AND gp.entity_id = l.id
                 WHERE l.id = %s AND z.slug = %s
             """, (location_id, zoo))
             loc = cur.fetchone()
@@ -103,6 +107,9 @@ def create_location(zoo):
 
     data = request.get_json(silent=True) or {}
     name = data.get("name", "").strip()
+    latitude    = data.get("latitude")
+    longitude   = data.get("longitude")
+
     if not name:
         return jsonify({"error": "name required"}), 400
     if len(name) > 200:
@@ -135,6 +142,14 @@ def create_location(zoo):
                 data.get("description_long") or None,
             ))
             location_id = cur.fetchone()["id"]
+
+            if latitude is not None and longitude is not None:
+                lat, lon = round_coordinates(latitude, longitude)
+                cur.execute("""
+                    INSERT INTO zoo.geo_points (entity_type, entity_id, latitude, longitude)
+                    VALUES ('location', %s, %s, %s)
+                    ON CONFLICT DO NOTHING
+                """, (location_id, lat, lon))
         pg.commit()
         return jsonify({"id": location_id, "message": "Created"}), 201
     except Exception:
@@ -155,7 +170,8 @@ def update_location(zoo, location_id):
 
     data = request.get_json(silent=True) or {}
     ALLOWED = {"name", "name_display", "description", "location_type",
-               "location_type_id", "sort_order", "domain_id", "url", "description_long"}
+               "location_type_id", "sort_order", "domain_id", "url", "description_long",
+               "latitude", "longitude"}
     unknown = set(data.keys()) - ALLOWED
     if unknown:
         return jsonify({"error": f"Unknown fields: {', '.join(sorted(unknown))}"}), 400
@@ -164,6 +180,10 @@ def update_location(zoo, location_id):
     if "name" in data:
         if not str(data["name"]).strip():
             return jsonify({"error": "name must not be empty"}), 400
+
+    # latitude/longitude go to geo_points, not locations table
+    latitude  = data.pop("latitude", None)
+    longitude = data.pop("longitude", None)
 
     set_clauses = ", ".join(f"{k} = %s" for k in data)
     values = list(data.values()) + [location_id, zoo]
@@ -180,6 +200,16 @@ def update_location(zoo, location_id):
             """, values)
             if not cur.fetchone():
                 return jsonify({"error": "Location not found"}), 404
+
+            if latitude is not None and longitude is not None:
+                lat, lon = round_coordinates(latitude, longitude)
+                cur.execute("""
+                    INSERT INTO zoo.geo_points (entity_type, entity_id, latitude, longitude)
+                    VALUES ('location', %s, %s, %s)
+                    ON CONFLICT (entity_type, entity_id) DO UPDATE
+                        SET latitude = EXCLUDED.latitude,
+                            longitude = EXCLUDED.longitude
+                """, (location_id, lat, lon))
         pg.commit()
         return jsonify({"message": "Updated"}), 200
     except Exception:

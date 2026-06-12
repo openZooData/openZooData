@@ -3,7 +3,7 @@ import psycopg2.extras
 from flask import Blueprint, jsonify, request
 from db import get_pg_connection
 from extensions import limiter
-from helpers.coordinates import is_valid_slug
+from helpers.coordinates import is_valid_slug, round_coordinates
 from helpers.authz import require_zoo_access
 
 houses_bp = Blueprint("houses_bp", __name__)
@@ -25,13 +25,15 @@ def get_houses(zoo):
                 SELECT h.id, h.name, h.description, h.history,
                        h.sponsor, h.notes, h.domain_id,
                        d.name AS domain_name,
-                       COUNT(e.id) AS enclosure_count
+                       COUNT(e.id) AS enclosure_count,
+                       gp.latitude, gp.longitude
                 FROM zoo.houses h
                 JOIN zoo.zoos z ON z.id = h.zoo_id
                 LEFT JOIN zoo.domains d ON d.id = h.domain_id
                 LEFT JOIN zoo.enclosures e ON e.house_id = h.id
+                LEFT JOIN zoo.geo_points gp ON gp.entity_type = 'house' AND gp.entity_id = h.id
                 WHERE z.slug = %s
-                GROUP BY h.id, d.name
+                GROUP BY h.id, d.name, gp.latitude, gp.longitude
                 ORDER BY h.name
             """, (zoo,))
             results = cur.fetchall()
@@ -59,10 +61,12 @@ def get_house(zoo, house_id):
             cur.execute("""
                 SELECT h.id, h.name, h.description, h.history,
                        h.sponsor, h.notes, h.domain_id,
-                       d.name AS domain_name
+                       d.name AS domain_name,
+                       gp.latitude, gp.longitude
                 FROM zoo.houses h
                 JOIN zoo.zoos z ON z.id = h.zoo_id
                 LEFT JOIN zoo.domains d ON d.id = h.domain_id
+                LEFT JOIN zoo.geo_points gp ON gp.entity_type = 'house' AND gp.entity_id = h.id
                 WHERE h.id = %s AND z.slug = %s
             """, (house_id, zoo))
             house = cur.fetchone()
@@ -119,6 +123,8 @@ def create_house(zoo):
     sponsor     = data.get("sponsor", "").strip() or None
     notes       = data.get("notes", "").strip() or None
     domain_id   = data.get("domain_id") or None
+    latitude    = data.get("latitude")
+    longitude   = data.get("longitude")
 
     if not name:
         return jsonify({"error": "name required"}), 400
@@ -140,6 +146,14 @@ def create_house(zoo):
                 RETURNING id
             """, (zoo_row["id"], name, description, history, sponsor, notes, domain_id))
             house_id = cur.fetchone()["id"]
+
+            if latitude is not None and longitude is not None:
+                lat, lon = round_coordinates(latitude, longitude)
+                cur.execute("""
+                    INSERT INTO zoo.geo_points (entity_type, entity_id, latitude, longitude)
+                    VALUES ('house', %s, %s, %s)
+                    ON CONFLICT DO NOTHING
+                """, (house_id, lat, lon))
         pg.commit()
         return jsonify({"id": house_id, "message": "Created"}), 201
     except Exception:
@@ -159,17 +173,22 @@ def update_house(zoo, house_id):
     if err: return err
 
     data = request.get_json(silent=True) or {}
-    ALLOWED = {"name", "description", "history", "sponsor", "notes", "domain_id"}
+    ALLOWED = {"name", "description", "history", "sponsor", "notes", "domain_id", "latitude", "longitude"}
     unknown = set(data.keys()) - ALLOWED
     if unknown:
         return jsonify({"error": f"Unknown fields: {', '.join(sorted(unknown))}"}), 400
-    if not data:
-        return jsonify({"error": "No fields to update"}), 400
     if "name" in data:
         if not data["name"] or not str(data["name"]).strip():
             return jsonify({"error": "name must not be empty"}), 400
         if len(str(data["name"])) > 200:
             return jsonify({"error": "name must be at most 200 characters"}), 400
+
+    # latitude/longitude go to geo_points, not houses table
+    latitude  = data.pop("latitude", None)
+    longitude = data.pop("longitude", None)
+
+    if not data and latitude is None and longitude is None:
+        return jsonify({"error": "No fields to update"}), 400
 
     set_clauses = ", ".join(f"{k} = %s" for k in data)
     values      = list(data.values()) + [house_id, zoo]
@@ -186,6 +205,16 @@ def update_house(zoo, house_id):
             """, values)
             if not cur.fetchone():
                 return jsonify({"error": "House not found"}), 404
+
+            if latitude is not None and longitude is not None:
+                lat, lon = round_coordinates(latitude, longitude)
+                cur.execute("""
+                    INSERT INTO zoo.geo_points (entity_type, entity_id, latitude, longitude)
+                    VALUES ('house', %s, %s, %s)
+                    ON CONFLICT (entity_type, entity_id) DO UPDATE
+                        SET latitude = EXCLUDED.latitude,
+                            longitude = EXCLUDED.longitude
+                """, (house_id, lat, lon))
         pg.commit()
         return jsonify({"message": "Updated"}), 200
     except Exception:
