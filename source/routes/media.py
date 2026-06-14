@@ -182,9 +182,8 @@ def upload_media(entity_type, entity_id):
                 cur.execute(f"SELECT id FROM {table} WHERE id = %s", (entity_id,))
             elif entity_type == "enclosure_species":
                 cur.execute("""
-                    SELECT es.id FROM enclosure_species es
-                    JOIN enclosures e ON e.id = es.enclosure_id
-                    WHERE es.id = %s AND e.zoo_id = %s
+                    SELECT id FROM zoo.enclosure_species
+                    WHERE id = %s AND zoo_id = %s
                 """, (entity_id, zoo_id))
             else:
                 cur.execute(

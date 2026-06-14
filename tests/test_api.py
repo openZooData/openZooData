@@ -312,7 +312,7 @@ def test_enclosure_update(base_url, test_zoo, jwt_headers, created_enclosure_id)
     resp = requests.put(
         f"{base_url}/api/v1/zoos/{test_zoo}/enclosures/{created_enclosure_id}",
         headers=jwt_headers,
-        json={"name": "Pytest-Testgehege (aktualisiert)"}
+        json={"note": "Pytest Test Notiz"}
     )
     assert resp.status_code == 200
 
@@ -502,7 +502,7 @@ def test_media_upload_enclosure(base_url, jwt_headers, test_zoo,
                                  created_enclosure_id, test_image_bytes):
     """POST /api/v1/media/enclosure/<id> → 201"""
     resp = requests.post(
-        f"{base_url}/api/v1/media/enclosure/{created_enclosure_id}",
+        f"{base_url}/api/v1/media/enclosure_species/{created_enclosure_id}",
         headers=jwt_headers,
         files={"file": ("enclosure_test.jpg", test_image_bytes, "image/jpeg")},
         data={"zoo": test_zoo, "label": "Pytest Enclosure Bild"}

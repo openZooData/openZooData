@@ -218,7 +218,7 @@ ALTER SEQUENCE community.releases_id_seq OWNED BY community.releases.id;
 CREATE TABLE zoo.births (
     id integer NOT NULL,
     zoo_id integer NOT NULL,
-    enclosure_id integer,
+    enclosure_species_id integer,
     species_id integer NOT NULL,
     birth_date date NOT NULL,
     count smallint DEFAULT 1,
@@ -290,7 +290,7 @@ ALTER SEQUENCE zoo.domains_id_seq OWNED BY zoo.domains.id;
 --
 
 CREATE TABLE zoo.enclosure_species (
-    enclosure_id integer,
+    enclosure_species_id integer,
     species_id integer NOT NULL,
     note text,
     count_adult smallint,
@@ -475,8 +475,7 @@ CREATE TABLE zoo.feedback_types (
 
 CREATE TABLE zoo.feeding_times (
     id integer NOT NULL,
-    enclosure_id integer NOT NULL,
-    species_id integer,
+    enclosure_species_id integer,
     feeding_time time without time zone NOT NULL,
     day_of_week smallint,
     note text,
@@ -1819,7 +1818,7 @@ ALTER TABLE ONLY community.releases
 --
 
 ALTER TABLE ONLY zoo.births
-    ADD CONSTRAINT births_enclosure_id_fkey FOREIGN KEY (enclosure_id) REFERENCES zoo.enclosures(id) ON DELETE SET NULL;
+    ADD CONSTRAINT births_enclosure_species_id_fkey FOREIGN KEY (enclosure_species_id) REFERENCES zoo.enclosure_species(id) ON DELETE SET NULL;
 
 
 --
@@ -1942,7 +1941,7 @@ ALTER TABLE ONLY zoo.feedback
 --
 
 ALTER TABLE ONLY zoo.feeding_times
-    ADD CONSTRAINT feeding_times_enclosure_id_fkey FOREIGN KEY (enclosure_id) REFERENCES zoo.enclosures(id) ON DELETE CASCADE;
+    ADD CONSTRAINT feeding_times_enclosure_species_id_fkey FOREIGN KEY (enclosure_species_id) REFERENCES zoo.enclosure_species(id) ON DELETE CASCADE;
 
 
 --

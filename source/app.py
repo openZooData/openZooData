@@ -39,7 +39,6 @@ if not PUBLIC_BASE_URL or not PUBLIC_BASE_URL.startswith(("https://", "http://")
 from routes.auth       import auth_bp
 from routes.app_auth   import app_auth_bp
 from routes.species    import species_bp
-from routes.enclosures import enclosures_bp
 from routes.sqlite     import sqlite_bp
 from routes.publish    import publish_bp
 from routes.media      import media_bp
@@ -47,18 +46,22 @@ from routes.feedback   import feedback_bp
 from routes.feed       import feed_bp
 from routes.zoo_routes import register_zoo_blueprints
 from routes.admin_routes import register_admin_blueprints
+from routes.media_bundle import media_bundle_bp
+from routes.qr           import qr_bp
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(app_auth_bp)
 app.register_blueprint(species_bp)
-app.register_blueprint(enclosures_bp)
 app.register_blueprint(sqlite_bp)
 app.register_blueprint(publish_bp)
 app.register_blueprint(media_bp)
 app.register_blueprint(feedback_bp)
 app.register_blueprint(feed_bp)
+app.register_blueprint(media_bundle_bp)
+app.register_blueprint(qr_bp)
 register_zoo_blueprints(app)
 register_admin_blueprints(app)
+
 
 @app.route("/")
 def root():
@@ -144,4 +147,6 @@ def ratelimit_handler(e):
 
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5001, debug=False)
+    host = os.getenv("FLASK_HOST", "127.0.0.1")
+    port = int(os.getenv("FLASK_PORT", "5001"))
+    app.run(host=host, port=port, debug=False)

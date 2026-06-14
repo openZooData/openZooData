@@ -170,9 +170,9 @@ def created_enclosure_id(base_url, test_zoo, jwt_headers, created_species_id):
         f"{base_url}/api/v1/zoos/{test_zoo}/enclosures",
         headers=jwt_headers,
         json={
-            "name":       "Pytest-Testgehege",
+            
             "species_id": created_species_id,
-            "domain_id":  None
+            "domain_id":  None, "note": "Pytest Test"
         }
     )
     if resp.status_code == 403:
