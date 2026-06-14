@@ -2,7 +2,7 @@ import os
 
 STORAGE_DIR = os.environ.get(
     "STORAGE_DIR",
-    os.path.join(os.path.expanduser("~"), "storage")
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 )
 
 

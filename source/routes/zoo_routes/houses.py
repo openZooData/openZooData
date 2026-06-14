@@ -26,14 +26,16 @@ def get_houses(zoo):
                        h.sponsor, h.notes, h.domain_id,
                        d.name AS domain_name,
                        COUNT(e.id) AS enclosure_count,
-                       gp.latitude, gp.longitude
+                       gp.latitude, gp.longitude,
+                       mimg.storage_path || mimg.filename AS image_path
                 FROM zoo.houses h
                 JOIN zoo.zoos z ON z.id = h.zoo_id
                 LEFT JOIN zoo.domains d ON d.id = h.domain_id
                 LEFT JOIN zoo.enclosures e ON e.house_id = h.id
                 LEFT JOIN zoo.geo_points gp ON gp.entity_type = 'house' AND gp.entity_id = h.id
+                LEFT JOIN zoo.media mimg ON mimg.id = h.image_media_id
                 WHERE z.slug = %s
-                GROUP BY h.id, d.name, gp.latitude, gp.longitude
+                GROUP BY h.id, d.name, gp.latitude, gp.longitude, mimg.storage_path, mimg.filename
                 ORDER BY h.name
             """, (zoo,))
             results = cur.fetchall()
@@ -62,11 +64,13 @@ def get_house(zoo, house_id):
                 SELECT h.id, h.name, h.description, h.history,
                        h.sponsor, h.notes, h.domain_id,
                        d.name AS domain_name,
-                       gp.latitude, gp.longitude
+                       gp.latitude, gp.longitude,
+                       mimg.storage_path || mimg.filename AS image_path
                 FROM zoo.houses h
                 JOIN zoo.zoos z ON z.id = h.zoo_id
                 LEFT JOIN zoo.domains d ON d.id = h.domain_id
                 LEFT JOIN zoo.geo_points gp ON gp.entity_type = 'house' AND gp.entity_id = h.id
+                LEFT JOIN zoo.media mimg ON mimg.id = h.image_media_id
                 WHERE h.id = %s AND z.slug = %s
             """, (house_id, zoo))
             house = cur.fetchone()

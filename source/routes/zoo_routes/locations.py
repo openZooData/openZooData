@@ -27,12 +27,16 @@ def get_locations(zoo):
                        l.url, l.description_long,
                        d.name AS domain_name,
                        lt.name AS location_type_name, lt.icon AS location_type_icon,
-                       gp.latitude, gp.longitude
+                       gp.latitude, gp.longitude,
+                       mi.storage_path || mi.filename AS icon_path,
+                       mimg.storage_path || mimg.filename AS image_path
                 FROM zoo.locations l
                 JOIN zoo.zoos z ON z.id = l.zoo_id
                 LEFT JOIN zoo.domains d ON d.id = l.domain_id
                 LEFT JOIN zoo.location_types lt ON lt.id = l.location_type_id
                 LEFT JOIN zoo.geo_points gp ON gp.entity_type = 'location' AND gp.entity_id = l.id
+                LEFT JOIN zoo.media mi ON mi.id = l.icon_media_id
+                LEFT JOIN zoo.media mimg ON mimg.id = l.image_media_id
                 WHERE z.slug = %s
                 ORDER BY l.sort_order, l.name
             """, (zoo,))
@@ -63,11 +67,15 @@ def get_location(zoo, location_id):
                        l.location_type, l.location_type_id, l.sort_order, l.domain_id,
                        l.url, l.description_long,
                        lt.name AS location_type_name, lt.icon AS location_type_icon,
-                       gp.latitude, gp.longitude
+                       gp.latitude, gp.longitude,
+                       mi.storage_path || mi.filename AS icon_path,
+                       mimg.storage_path || mimg.filename AS image_path
                 FROM zoo.locations l
                 JOIN zoo.zoos z ON z.id = l.zoo_id
                 LEFT JOIN zoo.location_types lt ON lt.id = l.location_type_id
                 LEFT JOIN zoo.geo_points gp ON gp.entity_type = 'location' AND gp.entity_id = l.id
+                LEFT JOIN zoo.media mi ON mi.id = l.icon_media_id
+                LEFT JOIN zoo.media mimg ON mimg.id = l.image_media_id
                 WHERE l.id = %s AND z.slug = %s
             """, (location_id, zoo))
             loc = cur.fetchone()

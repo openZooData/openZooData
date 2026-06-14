@@ -31,13 +31,17 @@ def get_enclosures(zoo):
                        es.count_adult, es.count_juvenile,
                        ARRAY_AGG(ft.feeding_time::TEXT ORDER BY ft.feeding_time)
                            FILTER (WHERE ft.feeding_time IS NOT NULL) AS feeding_times,
-                       gp.latitude, gp.longitude
+                       gp.latitude, gp.longitude,
+                       mimg.storage_path || mimg.filename AS image_path,
+                       ms.storage_path || ms.filename AS species_icon_path
                 FROM zoo.enclosures e
                 JOIN zoo.zoos z ON z.id = e.zoo_id
                 LEFT JOIN zoo.domains d ON d.id = e.domain_id
                 LEFT JOIN zoo.houses h ON h.id = e.house_id
+                LEFT JOIN zoo.media mimg ON mimg.id = e.image_media_id
                 LEFT JOIN zoo.enclosure_species es ON es.enclosure_id = e.id
                 LEFT JOIN zoo.species s ON s.id = es.species_id
+                LEFT JOIN zoo.media ms ON ms.id = s.icon_media_id
                 LEFT JOIN zoo.feeding_times ft
                        ON ft.enclosure_id = e.id
                       AND ft.species_id = es.species_id
@@ -50,7 +54,9 @@ def get_enclosures(zoo):
                          s.id, s.german_name, s.latin_name,
                          s.wikidata_id, s.iucn_status_id,
                          es.count_adult, es.count_juvenile,
-                         gp.latitude, gp.longitude
+                         gp.latitude, gp.longitude,
+                         mimg.storage_path, mimg.filename,
+                         ms.storage_path, ms.filename
                 ORDER BY e.sort_order, e.name
             """, (zoo,))
             results = cur.fetchall()

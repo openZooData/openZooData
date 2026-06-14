@@ -46,8 +46,8 @@ def get_zoo_species(zoo):
         )
         params.extend([f"%{search}%", f"%{search}%"])
 
-    where_extra = ("AND " + " AND ".join(conditions)) if conditions else ""
-
+    where_extra = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+    
     pg = None
     try:
         pg = get_pg_connection()
@@ -57,13 +57,15 @@ def get_zoo_species(zoo):
                     s.id, s.wikidata_id, s.german_name, s.latin_name,
                     s.iucn_status_id, s.iucn_id, s.gbif_taxon_key,
                     s.iucn_population_trend_id, s.id_valid,
-                    COUNT(DISTINCT e.id) AS enclosure_count
+                    COUNT(DISTINCT e.id) AS enclosure_count,
+                    m.storage_path || m.filename AS icon_path
                 FROM zoo.species s
                 LEFT JOIN zoo.enclosure_species es ON es.species_id = s.id
                 LEFT JOIN zoo.enclosures e ON e.id = es.enclosure_id
                     AND e.zoo_id = (SELECT id FROM zoo.zoos WHERE slug = %s)
+                LEFT JOIN zoo.media m ON m.id = s.icon_media_id
                 {where_extra}
-                GROUP BY s.id
+                GROUP BY s.id, m.storage_path, m.filename
                 ORDER BY s.german_name
             """, params)
             results = cur.fetchall()

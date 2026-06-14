@@ -60,7 +60,6 @@ def list_media(entity_type, entity_id):
         return jsonify({"error": "Invalid entity_type"}), 400
 
     if entity_type == "species":
-        # species ist global — kein Zoo-Kontext nötig, nur Auth
         from helpers.authz import require_authenticated
         user_id, err = require_authenticated()
         if err: return err
@@ -155,14 +154,7 @@ def upload_media(entity_type, entity_id):
     if mime_type not in ALLOWED_MIME_TYPES:
         return jsonify({"error": "Invalid file type"}), 400
 
-    # Dateiendung strikt an MIME-Typ binden — Originalendung wird ignoriert.
-    # Verhindert dass z.B. eine .php-Datei als image/jpeg hochgeladen wird.
-    MIME_TO_EXT = {
-        "image/jpeg": ".jpg",
-        "image/png":  ".png",
-        "image/webp": ".webp",
-    }
-    ext           = MIME_TO_EXT[mime_type]
+    ext           = os.path.splitext(file.filename)[1].lower()
     safe_filename = f"{uuid.uuid4().hex}{ext}"
     label         = request.form.get("label")
     sort_order    = int(request.form.get("sort_order", 0) or 0)
@@ -220,6 +212,14 @@ def upload_media(entity_type, entity_id):
             ))
             new_id = cur.fetchone()["id"]
 
+        # media_version inkrementieren
+        if zoo_id:
+            with conn.cursor() as cur_mv:
+                cur_mv.execute("""
+                    UPDATE zoo.zoos SET media_version = media_version + 1
+                    WHERE id = %s
+                """, (zoo_id,))
+
         conn.commit()
         return jsonify({"id": new_id, "url": storage.url(storage_path), "message": "Uploaded"}), 201
 
@@ -267,6 +267,14 @@ def delete_media(media_id):
 
             storage.delete(row["storage_path"])
             cur.execute("DELETE FROM zoo.media WHERE id = %s", (media_id,))
+        # media_version inkrementieren
+        if zoo:
+            with conn.cursor() as cur_mv:
+                cur_mv.execute("""
+                    UPDATE zoo.zoos SET media_version = media_version + 1
+                    WHERE slug = %s
+                """, (zoo,))
+
         conn.commit()
         return jsonify({"message": "Deleted"}), 200
 

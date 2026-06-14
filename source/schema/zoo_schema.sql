@@ -335,7 +335,8 @@ CREATE TABLE zoo.enclosures (
     osm_relation_id bigint,
     history text,
     sponsor text,
-    notes text
+    notes text,
+    image_media_id integer
 );
 
 
@@ -586,7 +587,8 @@ CREATE TABLE zoo.houses (
     history text,
     sponsor text,
     notes text,
-    domain_id integer
+    domain_id integer,
+    image_media_id integer
 );
 
 
@@ -693,7 +695,8 @@ CREATE TABLE zoo.location_types (
     slug character varying(50) NOT NULL,
     name character varying(100) NOT NULL,
     icon character varying(100),
-    sort_order integer DEFAULT 0
+    sort_order integer DEFAULT 0,
+    icon_media_id integer
 );
 
 
@@ -732,7 +735,9 @@ CREATE TABLE zoo.locations (
     domain_id integer,
     url character varying(255),
     description_long text,
-    location_type_id integer
+    location_type_id integer,
+    icon_media_id integer,
+    image_media_id integer
 );
 
 
@@ -855,7 +860,8 @@ CREATE TABLE zoo.species (
     gbif_taxon_key integer,
     id_valid boolean DEFAULT false,
     translations_valid boolean DEFAULT false,
-    iucn_id character varying(20)
+    iucn_id character varying(20),
+    icon_media_id integer
 );
 
 
@@ -1036,6 +1042,7 @@ CREATE TABLE zoo.zoos (
     bottom_right_longitude double precision,
     map_overlay character varying(100),
     data_version integer DEFAULT 0,
+    media_version integer DEFAULT 0 NOT NULL,
     is_active boolean DEFAULT true,
     easy_language boolean DEFAULT false,
     number_animals integer,
@@ -2106,3 +2113,28 @@ INSERT INTO zoo.location_types (slug, name, icon, sort_order) VALUES
   ('sonstiges',           'Sonstiges',             'dots',           99);
 
 CREATE UNIQUE INDEX uq_geo_points_entity ON zoo.geo_points (entity_type, entity_id);
+
+-- Media FK constraints (migration Juni 2026)
+ALTER TABLE ONLY zoo.species
+    ADD CONSTRAINT species_icon_media_id_fkey FOREIGN KEY (icon_media_id) REFERENCES zoo.media(id) ON DELETE SET NULL;
+
+ALTER TABLE ONLY zoo.location_types
+    ADD CONSTRAINT location_types_icon_media_id_fkey FOREIGN KEY (icon_media_id) REFERENCES zoo.media(id) ON DELETE SET NULL;
+
+ALTER TABLE ONLY zoo.locations
+    ADD CONSTRAINT locations_icon_media_id_fkey FOREIGN KEY (icon_media_id) REFERENCES zoo.media(id) ON DELETE SET NULL;
+
+ALTER TABLE ONLY zoo.locations
+    ADD CONSTRAINT locations_image_media_id_fkey FOREIGN KEY (image_media_id) REFERENCES zoo.media(id) ON DELETE SET NULL;
+
+ALTER TABLE ONLY zoo.enclosures
+    ADD CONSTRAINT enclosures_image_media_id_fkey FOREIGN KEY (image_media_id) REFERENCES zoo.media(id) ON DELETE SET NULL;
+
+ALTER TABLE ONLY zoo.houses
+    ADD CONSTRAINT houses_image_media_id_fkey FOREIGN KEY (image_media_id) REFERENCES zoo.media(id) ON DELETE SET NULL;
+
+CREATE INDEX idx_species_icon_media ON zoo.species (icon_media_id) WHERE icon_media_id IS NOT NULL;
+CREATE INDEX idx_locations_icon_media ON zoo.locations (icon_media_id) WHERE icon_media_id IS NOT NULL;
+CREATE INDEX idx_locations_image_media ON zoo.locations (image_media_id) WHERE image_media_id IS NOT NULL;
+CREATE INDEX idx_enclosures_image_media ON zoo.enclosures (image_media_id) WHERE image_media_id IS NOT NULL;
+CREATE INDEX idx_houses_image_media ON zoo.houses (image_media_id) WHERE image_media_id IS NOT NULL;

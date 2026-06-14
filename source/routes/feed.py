@@ -68,7 +68,7 @@ def _build_feed(zoo_row, item_rows, base_url: str) -> str:
     item_rows — Liste von (version, file_size, exported_at, changelog)
     """
     (zoo_id, slug, name, zoo_url, description,
-     latitude, longitude, data_version, icon_url) = zoo_row
+     latitude, longitude, data_version, media_version, icon_url) = zoo_row
 
     feed_url   = f"{base_url}/feed/{slug}"
     sqlite_url = f"{base_url}/db/{slug}"
@@ -90,6 +90,7 @@ def _build_feed(zoo_row, item_rows, base_url: str) -> str:
         f'    <zoo:feedVersion>{FEED_VERSION}</zoo:feedVersion>',
         f'    <zoo:slug>{_xml_escape(slug)}</zoo:slug>',
         f'    <zoo:version>{data_version}</zoo:version>',
+        f'    <zoo:mediaVersion>{media_version}</zoo:mediaVersion>',
         f'    <zoo:displayName>{_xml_escape(name)}</zoo:displayName>',
         f'    <zoo:id>{zoo_id}</zoo:id>',
     ]
@@ -127,6 +128,9 @@ def _build_feed(zoo_row, item_rows, base_url: str) -> str:
             f'      <enclosure url="{_xml_escape(sqlite_url)}"',
             f'                 length="{file_size or 0}"',
             '                 type="application/x-sqlite3+gzip"/>',
+            f'      <zoo:mediaBundle url="{_xml_escape(base_url)}/media-bundle/{_xml_escape(slug)}"'
+            f'                       mediaVersion="{media_version}"'
+            '                       type="application/x-media-bundle+gzip"/>',
             '    </item>',
         ]
 
@@ -150,7 +154,7 @@ def get_feed(zoo):
                 SELECT
                     id, slug, name, url, description,
                     top_left_latitude, top_left_longitude,
-                    data_version, icon_url
+                    data_version, media_version, icon_url
                 FROM zoo.zoos
                 WHERE slug = %s AND is_active = TRUE
             """, (zoo,))
