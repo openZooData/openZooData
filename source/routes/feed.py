@@ -130,7 +130,7 @@ def _build_feed(zoo_row, item_rows, base_url: str) -> str:
             '                 type="application/x-sqlite3+gzip"/>',
             f'      <zoo:mediaBundle url="{_xml_escape(base_url)}/media-bundle/{_xml_escape(slug)}"'
             f'                       mediaVersion="{media_version}"'
-            '                       type="application/x-media-bundle+gzip"/>',
+            '                       type="application/zip"/>',
             '    </item>',
         ]
 

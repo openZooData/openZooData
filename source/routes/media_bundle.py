@@ -2,7 +2,7 @@
 routes/media_bundle.py — Media-Bundle-Endpoint
 
 GET /media-bundle/<zoo>
-  → Liefert alle Bilder eines Zoos als gzip-komprimiertes tar-Archiv.
+  → Liefert alle Bilder eines Zoos als gzip-komprimiertes ZIP-Archiv.
   → Enthält: Locations, Houses, Enclosures + Species die in diesem Zoo vorkommen.
   → Versionierung via zoo.zoos.media_version (ETag + 304 Not Modified).
   → Auth: App-Token oder JWT.
@@ -24,7 +24,7 @@ Bundle-Struktur:
 import io
 import logging
 import os
-import tarfile
+import zipfile
 
 import psycopg2.extras
 from flask import Blueprint, jsonify, request, send_file
@@ -43,7 +43,7 @@ storage = FilesystemBackend()
 @limiter.limit("10 per minute")
 def get_media_bundle(zoo):
     """
-    Media-Bundle für einen Zoo — alle Bilder als tar.gz.
+    Media-Bundle für einen Zoo — alle Bilder als ZIP.
     Versionierung: ETag = media_version, 304 wenn unverändert.
     Auth: App-Token oder JWT.
     """
@@ -108,12 +108,12 @@ def get_media_bundle(zoo):
         if not media_rows:
             return jsonify({"error": "No media found"}), 404
 
-        # tar.gz im Speicher aufbauen
+        # ZIP im Speicher aufbauen
         buf = io.BytesIO()
         prefix = f"{zoo}_media"
         added = set()  # Duplikate vermeiden
 
-        with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+        with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
             for row in media_rows:
                 storage_path = row["storage_path"]
                 entity_type  = row["entity_type"]
@@ -129,14 +129,14 @@ def get_media_bundle(zoo):
                     logging.warning(f"Media file not found: {full_path}")
                     continue
 
-                tar.add(full_path, arcname=arcname)
+                zf.write(full_path, arcname=arcname)
 
         buf.seek(0)
-        bundle_filename = f"{zoo}_media_v{media_version}.tar.gz"
+        bundle_filename = f"{zoo}_media_v{media_version}.zip"
 
         response = send_file(
             buf,
-            mimetype="application/x-media-bundle+gzip",
+            mimetype="application/zip",
             as_attachment=True,
             download_name=bundle_filename
         )
