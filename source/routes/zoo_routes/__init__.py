@@ -5,6 +5,9 @@ from .domains import domains_bp
 from .locations import locations_bp
 from .location_types import location_types_bp
 from .enclosures import enclosures_bp
+from .species_global import species_bp
+from .enclosure import enclosure_bp
+from .enclosure_species import enclosure_species_bp
 
 def register_zoo_blueprints(app):
     app.register_blueprint(zoos_bp)
@@ -14,3 +17,6 @@ def register_zoo_blueprints(app):
     app.register_blueprint(locations_bp)
     app.register_blueprint(location_types_bp)
     app.register_blueprint(enclosures_bp)
+    app.register_blueprint(species_bp)
+    app.register_blueprint(enclosure_bp)
+    app.register_blueprint(enclosure_species_bp)

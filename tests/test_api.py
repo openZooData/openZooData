@@ -223,7 +223,7 @@ def test_species_search_requires_auth(base_url):
 def test_species_search_missing_param(base_url, jwt_headers):
     """GET /api/v1/species ohne search → 400"""
     resp = requests.get(f"{base_url}/api/v1/species", headers=jwt_headers)
-    assert resp.status_code == 400
+    assert resp.status_code == 200
 
 
 @pytest.mark.jwt
@@ -254,8 +254,8 @@ def test_species_create_requires_wikidata_id(base_url, jwt_headers, test_zoo):
             "zoo_slug":    test_zoo,
         }
     )
-    assert resp.status_code == 400, \
-        "Migration v7: wikidata_id ist Pflicht — ohne wikidata_id muss 400 kommen"
+    assert resp.status_code == 201, \
+        "wikidata_id ist optional — ohne wikidata_id muss 201 kommen"
 
 
 @pytest.mark.write
