@@ -37,3 +37,4 @@ typing_extensions==4.13.0
 urllib3==2.7.0
 Werkzeug==3.1.6
 wrapt==1.17.2
+qrcode[pil]>=8.0

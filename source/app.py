@@ -38,7 +38,6 @@ if not PUBLIC_BASE_URL or not PUBLIC_BASE_URL.startswith(("https://", "http://")
 
 from routes.auth       import auth_bp
 from routes.app_auth   import app_auth_bp
-from routes.species    import species_bp
 from routes.sqlite     import sqlite_bp
 from routes.publish    import publish_bp
 from routes.media      import media_bp
@@ -51,7 +50,6 @@ from routes.qr           import qr_bp
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(app_auth_bp)
-app.register_blueprint(species_bp)
 app.register_blueprint(sqlite_bp)
 app.register_blueprint(publish_bp)
 app.register_blueprint(media_bp)

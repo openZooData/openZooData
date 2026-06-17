@@ -199,11 +199,11 @@ def create_enclosure(zoo):
             cur.execute("""
                 INSERT INTO zoo.enclosure_species
                     (species_id, enclosure_id, house_id, note,
-                     count_adult, count_juvenile)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                    count_adult, count_juvenile, zoo_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
-            """, (species_id, enclosure_id, house_id, note,
-                  count_adult, count_juvenile))
+                """, (species_id, enclosure_id, house_id, note,
+                    count_adult, count_juvenile, zoo_id))
             es_id = cur.fetchone()["id"]
 
             # GPS-Position

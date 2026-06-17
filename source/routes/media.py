@@ -31,15 +31,13 @@ ENTITY_TABLE_MAP = {
 
 
 @media_bp.route("/api/v1/files/<path:storage_path>", methods=["GET"])
-@limiter.limit("120 per minute")
+@limiter.limit("900 per minute")
 def serve_file(storage_path):
     # Fix 1: Zoo aus Pfad-Segment ableiten — kein ?zoo= Parameter nötig.
     # storage_path hat das Format "<zoo>/<entity_type>/<filename>".
     # Erstes Segment IS der Zoo → für Auth und Traversal-Schutz verwenden.
-    first_segment = os.path.normpath(storage_path).split(os.sep, 1)[0]
-    if not is_valid_slug(first_segment):
-        return jsonify({"error": "Invalid path"}), 400
-    user_id, err = require_zoo_access(first_segment, 'read')
+    from helpers.authz import require_authenticated
+    user_id, err = require_authenticated()
     if err: return err
 
     full_path    = storage.full_path(storage_path)

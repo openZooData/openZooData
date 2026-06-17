@@ -28,5 +28,5 @@ echo "  Port: $PORT"
 echo "  DB:   TrueNAS ($(grep PG_HOST "$ROOT_DIR/.env" | cut -d= -f2))"
 echo "========================================"
 
-export PYTHONPATH="$ROOT_DIR/source"
+export FLASK_HOST=0.0.0.0
 exec "$ROOT_DIR/venv/bin/python3" "$ROOT_DIR/source/app.py"

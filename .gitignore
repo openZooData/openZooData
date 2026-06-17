@@ -29,3 +29,8 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+media/
+backup/
+zoo_test1/
+check_media_files.py
+GetZooID.py
