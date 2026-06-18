@@ -54,8 +54,8 @@ def get_enclosures(zoo):
         conditions.append("es.house_id = %s")
         params.append(int(house_id_filter))
     if domain_id_filter:
-        conditions.append("(e.domain_id = %s OR h.domain_id = %s)")
-        params.extend([int(domain_id_filter), int(domain_id_filter)])
+        conditions.append("(e.domain_id = %s OR h.domain_id = %s OR es.domain_id = %s)")
+        params.extend([int(domain_id_filter), int(domain_id_filter), int(domain_id_filter)])
 
     where = " AND ".join(conditions)
 
@@ -73,6 +73,7 @@ def get_enclosures(zoo):
                     es.count_adult,
                     es.count_juvenile,
                     es.counted_at,
+                    es.domain_id,
                     s.german_name,
                     s.latin_name,
                     s.wikidata_id,
@@ -105,7 +106,7 @@ def get_enclosures(zoo):
                 WHERE {where}
                 GROUP BY
                     es.id, es.species_id, es.enclosure_id, es.house_id,
-                    es.note, es.count_adult, es.count_juvenile, es.counted_at,
+                    es.note, es.count_adult, es.count_juvenile, es.counted_at, es.domain_id,
                     s.german_name, s.latin_name, s.wikidata_id,
                     s.iucn_status_id, s.iucn_id, s.gbif_taxon_key,
                     e.name, e.sort_order, e.domain_id,
@@ -155,6 +156,7 @@ def create_enclosure(zoo):
     count_juvenile = data.get("count_juvenile")
     latitude       = data.get("latitude")
     longitude      = data.get("longitude")
+    domain_id      = data.get("domain_id")
     feeding_times  = data.get("feeding_times", [])
 
     if not species_id:
@@ -199,11 +201,11 @@ def create_enclosure(zoo):
             cur.execute("""
                 INSERT INTO zoo.enclosure_species
                     (species_id, enclosure_id, house_id, note,
-                    count_adult, count_juvenile, zoo_id)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    count_adult, count_juvenile, zoo_id, domain_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
                 """, (species_id, enclosure_id, house_id, note,
-                    count_adult, count_juvenile, zoo_id))
+                    count_adult, count_juvenile, zoo_id, domain_id))
             es_id = cur.fetchone()["id"]
 
             # GPS-Position
@@ -253,7 +255,7 @@ def update_enclosure(zoo, es_id):
 
     data = request.get_json(silent=True) or {}
 
-    ALLOWED = {"enclosure_id", "house_id", "note", "count_adult",
+    ALLOWED = {"enclosure_id", "house_id", "domain_id", "note", "count_adult",
                "count_juvenile", "latitude", "longitude", "feeding_times"}
     unknown = set(data.keys()) - ALLOWED
     if unknown:

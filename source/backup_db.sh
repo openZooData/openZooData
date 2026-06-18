@@ -15,11 +15,15 @@
 
 set -e
 
-# Credentials aus ~/.env laden
-if [ -f ~/.env ]; then
-    export $(grep -E '^(PG_HOST|PG_PORT|PG_USER|PG_PASSWORD|PG_NAME)=' ~/.env | xargs)
+# Verzeichnis des Scripts ermitteln
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENV_FILE="$SCRIPT_DIR/../.env"
+
+# Credentials aus .env laden
+if [ -f "$ENV_FILE" ]; then
+    export $(grep -E '^(PG_HOST|PG_PORT|PG_USER|PG_PASSWORD|PG_NAME)=' "$ENV_FILE" | xargs)
 else
-    echo "FEHLER: ~/.env nicht gefunden"
+    echo "FEHLER: .env nicht gefunden in $ENV_FILE"
     exit 1
 fi
 
