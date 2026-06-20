@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZooGuide QR-Codes</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  body { font-family: sans-serif; margin: 2rem; }
+  #controls { margin-bottom: 1.5rem; }
+  #controls input { padding: 0.4rem; width: 280px; }
+  #controls button { padding: 0.4rem 1rem; margin-left: 0.5rem; }
+  #grid { display: flex; flex-wrap: wrap; gap: 2rem; }
+  .zoo { text-align: center; }
+  .zoo p { margin: 0.5rem 0 0; font-weight: bold; }
+  .zoo small { color: #666; }
+  #error { color: #b00; margin-top: 1rem; }
+</style>
+</head>
+<body>
+
+<div id="controls">
+  <input id="baseUrl" type="text" value="http://localhost:5001">
+  <button onclick="loadZoos()">Laden</button>
+</div>
+
+<div id="grid"></div>
+<div id="error"></div>
+
+<script>
+async function loadZoos() {
+  const baseUrl = document.getElementById('baseUrl').value.replace(/\/$/, '');
+  const grid    = document.getElementById('grid');
+  const errorEl = document.getElementById('error');
+  grid.innerHTML = '';
+  errorEl.textContent = '';
+
+  let zoos;
+  try {
+    const resp = await fetch(`${baseUrl}/feed`);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    zoos = await resp.json();
+  } catch (err) {
+    errorEl.textContent = `Konnte ${baseUrl}/feed nicht laden: ${err.message}`;
+    return;
+  }
+
+  if (!zoos.length) {
+    errorEl.textContent = 'Keine aktiven Zoos auf diesem Server.';
+    return;
+  }
+
+  for (const zoo of zoos) {
+    const div = document.createElement('div');
+    div.className = 'zoo';
+    grid.appendChild(div);
+
+    const qrDiv = document.createElement('div');
+    div.appendChild(qrDiv);
+    new QRCode(qrDiv, { text: zoo.feed_url, width: 200, height: 200 });
+
+    const p = document.createElement('p');
+    p.textContent = zoo.name;
+    div.appendChild(p);
+
+    const small = document.createElement('small');
+    small.textContent = `v${zoo.version}`;
+    div.appendChild(small);
+  }
+}
+
+loadZoos();
+</script>
+
+</body>
+</html>
