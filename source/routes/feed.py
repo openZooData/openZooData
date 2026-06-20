@@ -17,7 +17,7 @@ import os
 import logging
 from datetime import datetime, timezone
 from email.utils import formatdate
-from flask import Blueprint, Response, jsonify
+from flask import Blueprint, Response, request, jsonify
 from helpers.coordinates import is_valid_slug
 from db import get_pg_connection
 from extensions import limiter
@@ -198,6 +198,7 @@ def get_feed(zoo):
             "Content-Type":  "application/rss+xml; charset=utf-8",
             "Cache-Control": "public, max-age=300",
             "X-Zoo-Version": str(zoo_row[7]),
+            "Access-Control-Allow-Origin": "*",
         }
     )
 
@@ -234,4 +235,6 @@ def list_feeds():
         }
         for row in zoos
     ]
-    return jsonify(result), 200
+    resp = jsonify(result)
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp, 200
