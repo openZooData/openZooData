@@ -73,6 +73,60 @@ Lokal: `http://localhost:5001`
 
 -----
 
+## Enclosure Species (Tier-Zuordnungen) ✨ neu
+
+Verknüpft eine Tierart (Species) mit einem Ort im Zoo — optional einem
+Enclosure (Freigehege) und/oder einem House (Tierhaus). Zentraler
+Knotenpunkt für Fütterungszeiten, Geburten, GPS-Position (`geo_points`) und
+Foto (`media`).
+
+|Method|Endpoint                                  |Auth     |Beschreibung                                      |
+|------|-------------------------------------------|---------|---------------------------------------------------|
+|GET   |`/api/v1/zoos/<zoo>/enclosure_species`     |JWT read |Alle Tier-Zuordnungen inkl. `feeding_times`, `births`|
+|POST  |`/api/v1/zoos/<zoo>/enclosure_species`     |JWT write|Zuordnung anlegen                                 |
+|PUT   |`/api/v1/zoos/<zoo>/enclosure_species/<id>`|JWT write|Zuordnung bearbeiten                              |
+|DELETE|`/api/v1/zoos/<zoo>/enclosure_species/<id>`|JWT write|Zuordnung löschen (inkl. `media`/`geo_points`)    |
+
+**Query-Parameter für GET:**
+
+- `?enclosure_id=<id>` — Filter nach Gehege
+- `?house_id=<id>` — Filter nach Tierhaus
+- `?domain_id=<id>` — Filter nach Domain (Enclosure, House oder enclosure_species selbst)
+
+**Kein eigener Endpoint für `feeding_times`/`births`:** beide werden
+ausschließlich über `enclosure_species` verwaltet. `enclosure_species_id`
+(und bei `births` zusätzlich `species_id`/`zoo_id`) kommen immer aus dem
+URL-/Parent-Kontext — der Client schickt sie nie mit.
+
+POST/PUT-Body (Auszug):
+
+```json
+{
+  "species_id": 42,
+  "enclosure_id": 7,
+  "feeding_times": ["09:00", "15:30"],
+  "births": [
+    {"birth_date": "2026-03-01", "count": 2, "note": "Zwillinge", "is_public": true}
+  ]
+}
+```
+
+- `feeding_times`: Liste von Uhrzeiten (`"HH:MM"`)
+- `births`: Liste von Objekten, `birth_date` Pflicht, `count` (Default `1`), `note`, `is_public` (Default `true`)
+- PUT ersetzt eine mitgeschickte Liste komplett (delete-all-reinsert); `[]` löscht alle Einträge, ein fehlendes Feld lässt bestehende Einträge unverändert
+- `species_id` ist über PUT nicht änderbar (400 bei Versuch)
+
+**DELETE-Verhalten:**
+
+|Tabelle      |Verhalten                                              |
+|-------------|--------------------------------------------------------|
+|feeding_times|automatisch mitgelöscht (`ON DELETE CASCADE`)            |
+|births       |bleibt erhalten, `enclosure_species_id` wird `NULL` (historisches Faktum)|
+|geo_points   |wird explizit gelöscht (polymorph, keine FK möglich)     |
+|media        |wird explizit gelöscht inkl. physischer Datei (polymorph, keine FK möglich)|
+
+-----
+
 ## Domains (Zoo-Bereiche)
 
 |Method|Endpoint                         |Auth     |Beschreibung                          |
@@ -284,6 +338,7 @@ Gibt `409` wenn bereits ein Export für diesen Zoo läuft.
 |Zoos          |2        |                               |
 |Enclosures    |4        |                               |
 |Houses        |5        |                               |
+|Enclosure Species|4     |✨ neu                          |
 |Domains       |5        |✨ +4 (POST/PUT/DELETE + GET id)|
 |Locations     |5        |✨ neu                          |
 |Location Types|5        |✨ neu                          |
@@ -298,4 +353,4 @@ Gibt `409` wenn bereits ein Export für diesen Zoo läuft.
 |Admin Users   |4        |                               |
 |Admin Rollen  |6        |                               |
 |Admin System  |7        |                               |
-|**Gesamt**    |**85**   |**+5 gegenüber V1**            |
+|**Gesamt**    |**89**   |**+9 gegenüber V1**            |

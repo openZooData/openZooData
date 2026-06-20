@@ -4,12 +4,19 @@ import psycopg2.extras
 from flask import Blueprint, jsonify, request
 from db import get_pg_connection, get_auth_connection
 from extensions import limiter
-from helpers.authz import require_super_admin
+from helpers.authz import require_super_admin, get_user_id_from_token
+from helpers.audit import log_action
 from helpers.coordinates import is_valid_slug
 from routes.admin_routes.helpers import (_get_zoo_id_by_slug, _is_super_admin,
-    _would_remove_last_super_admin)
+    _would_remove_last_super_admin, _can_manage_zoo)
 
 admin_roles_bp = Blueprint("admin_roles_bp", __name__)
+
+# Müssen exakt den CHECK-Constraints in auth_schema.sql entsprechen:
+#   auth.user_zoo_roles.role    CHECK (role IN ('zoo_admin', 'editor', 'viewer'))
+#   auth.user_global_roles.role CHECK (role IN ('super_admin', 'moderator'))
+VALID_ZOO_ROLES = {"zoo_admin", "editor", "viewer"}
+VALID_GLOBAL_ROLES = {"super_admin", "moderator"}
 
 @admin_roles_bp.route("/api/v1/admin/users/<int:user_id>/roles/zoo", methods=["POST"])
 @limiter.limit("30 per minute")
@@ -102,6 +109,7 @@ def grant_zoo_role(user_id):
         if conn: conn.close()
 
 
+@admin_roles_bp.route("/api/v1/admin/users/<int:user_id>/roles/zoo/<zoo>/<role>", methods=["DELETE"])
 @limiter.limit("10 per minute")
 def revoke_zoo_role(user_id, zoo, role):
     """
@@ -154,6 +162,7 @@ def revoke_zoo_role(user_id, zoo, role):
 # ── A8 + A9: Tenant-Rolle vergeben / entziehen ───────────────────────────────
 
 
+@admin_roles_bp.route("/api/v1/admin/users/<int:user_id>/roles/tenant", methods=["POST"])
 @limiter.limit("30 per minute")
 def grant_tenant_role(user_id):
     """Tenant-Rolle vergeben. Nur super_admin. Body: { tenant_id, role }"""
@@ -208,6 +217,7 @@ def grant_tenant_role(user_id):
         if conn: conn.close()
 
 
+@admin_roles_bp.route("/api/v1/admin/users/<int:user_id>/roles/tenant/<int:tenant_id>", methods=["DELETE"])
 @limiter.limit("10 per minute")
 def revoke_tenant_role(user_id, tenant_id):
     """Tenant-Rolle entziehen. Nur super_admin."""
@@ -241,6 +251,7 @@ def revoke_tenant_role(user_id, tenant_id):
 # ── A10: User deaktivieren ───────────────────────────────────────────────────
 
 
+@admin_roles_bp.route("/api/v1/admin/users/<int:user_id>/roles/global", methods=["POST"])
 @limiter.limit("10 per minute")
 def grant_global_role(user_id):
     """Globale Rolle vergeben. Nur super_admin."""
@@ -281,6 +292,7 @@ def grant_global_role(user_id):
         if conn: conn.close()
 
 
+@admin_roles_bp.route("/api/v1/admin/users/<int:user_id>/roles/global/<role>", methods=["DELETE"])
 @limiter.limit("10 per minute")
 def revoke_global_role(user_id, role):
     """

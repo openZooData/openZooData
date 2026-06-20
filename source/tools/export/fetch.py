@@ -140,8 +140,7 @@ def fetch_enclosure_species(pg, zoo_id: int) -> List[tuple]:
                    es.count_adult, es.count_juvenile,
                    es.counted_at::TEXT
             FROM enclosure_species es
-            JOIN enclosures e ON e.id = es.enclosure_id
-            WHERE e.zoo_id = %s
+            WHERE es.zoo_id = %s
         """, (zoo_id,))
         return cur.fetchall()
 
@@ -149,12 +148,12 @@ def fetch_enclosure_species(pg, zoo_id: int) -> List[tuple]:
 def fetch_feeding_times(pg, zoo_id: int) -> List[tuple]:
     with pg.cursor() as cur:
         cur.execute("""
-            SELECT ft.id, ft.enclosure_id, ft.species_id,
+            SELECT ft.id, ft.enclosure_species_id, ft.species_id,
                    ft.feeding_time::TEXT, ft.day_of_week,
                    ft.note, ft.is_public::INT
             FROM feeding_times ft
-            JOIN enclosures e ON e.id = ft.enclosure_id
-            WHERE e.zoo_id = %s
+            JOIN enclosure_species es ON es.id = ft.enclosure_species_id
+            WHERE es.zoo_id = %s
         """, (zoo_id,))
         return cur.fetchall()
 
@@ -234,15 +233,17 @@ def fetch_geo_points(pg, zoo_id: int) -> List[tuple]:
                 SELECT id FROM enclosures WHERE zoo_id = %s))
             OR (g.entity_type = 'house' AND g.entity_id IN (
                 SELECT id FROM houses WHERE zoo_id = %s))
+            OR (g.entity_type = 'enclosure_species' AND g.entity_id IN (
+                SELECT id FROM enclosure_species WHERE zoo_id = %s))
             ORDER BY g.entity_type, g.entity_id, g.sort_order
-        """, (zoo_id, zoo_id, zoo_id, zoo_id))
+        """, (zoo_id, zoo_id, zoo_id, zoo_id, zoo_id))
         return cur.fetchall()
 
 
 def fetch_births(pg, zoo_id: int) -> List[tuple]:
     with pg.cursor() as cur:
         cur.execute("""
-            SELECT id, zoo_id, enclosure_id, species_id,
+            SELECT id, zoo_id, enclosure_species_id, species_id,
                    birth_date::TEXT, count, note,
                    is_public::INT, created_at::TEXT
             FROM births

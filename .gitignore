@@ -36,3 +36,4 @@ check_media_files.py
 GetZooID.py
 tests/.env_test
 tests/.env_test
+.env_test

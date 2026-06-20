@@ -51,13 +51,13 @@ def _get_feedback_types():
 
 
 REQUIRED_FIELDS = {
-    1:  ["enclosure_id", "value_time"],
-    2:  ["enclosure_id", "value_latitude", "value_longitude"],
-    3:  ["enclosure_id", "value_wikidata_id"],
-    4:  ["enclosure_id", "value_species_id"],
-    5:  ["enclosure_id", "value_species_id", "value_date"],
-    6:  ["enclosure_id", "value_species_id", "value_count"],
-    7:  ["enclosure_id", "value_species_id", "value_count"],
+    1:  ["enclosure_species_id", "value_time"],
+    2:  ["enclosure_species_id", "value_latitude", "value_longitude"],
+    3:  ["enclosure_species_id", "value_wikidata_id"],
+    4:  ["enclosure_species_id", "value_species_id"],
+    5:  ["enclosure_species_id", "value_species_id", "value_date"],
+    6:  ["enclosure_species_id", "value_species_id", "value_count"],
+    7:  ["enclosure_species_id", "value_species_id", "value_count"],
     8:  ["value_enrichment_text_id", "value_report_reason_id", "value_language"],
     9:  ["value_enrichment_text_id"],
     10: ["value_enrichment_text_id"],
@@ -159,7 +159,7 @@ def create_feedback(zoo):
     if missing:
         return jsonify({"error": f"Missing required fields for type {ft['slug']}: {missing}"}), 400
 
-    enclosure_id             = data.get("enclosure_id")
+    enclosure_species_id     = data.get("enclosure_species_id")
     value_time               = data.get("value_time")
     value_latitude           = data.get("value_latitude")
     value_longitude          = data.get("value_longitude")
@@ -183,19 +183,20 @@ def create_feedback(zoo):
                 return jsonify({"error": "Zoo not found"}), 404
             zoo_id = zoo_row["id"]
 
-            # Fix 6: enclosure_id und value_species_id gegen Zoo validieren
-            if enclosure_id is not None:
+            # Fix 6: enclosure_species_id und value_species_id gegen Zoo validieren
+            # enclosure_species hat eine eigene zoo_id-Spalte — kein Join nötig.
+            if enclosure_species_id is not None:
                 cur.execute("""
-                    SELECT id FROM zoo.enclosures
+                    SELECT id FROM zoo.enclosure_species
                     WHERE id = %s AND zoo_id = %s
-                """, (enclosure_id, zoo_id))
+                """, (enclosure_species_id, zoo_id))
                 if not cur.fetchone():
-                    return jsonify({"error": "enclosure not found in this zoo"}), 400
+                    return jsonify({"error": "enclosure_species not found in this zoo"}), 400
 
             cur.execute("""
                 INSERT INTO zoo.feedback (
                     zoo_id, feedback_type_id, contributor_id, status,
-                    enclosure_id,
+                    enclosure_species_id,
                     value_time, value_latitude, value_longitude,
                     value_wikidata_id, value_species_id, value_date, value_count,
                     value_enrichment_text_id, value_report_reason_id, value_language
@@ -209,7 +210,7 @@ def create_feedback(zoo):
                 RETURNING id, status, created_at
             """, (
                 zoo_id, feedback_type_id, contributor_id, status,
-                enclosure_id,
+                enclosure_species_id,
                 value_time, value_latitude, value_longitude,
                 value_wikidata_id, value_species_id, value_date, value_count,
                 value_enrichment_text_id, value_report_reason_id, value_language
@@ -266,7 +267,7 @@ def get_feedback(zoo):
                     COUNT(DISTINCT f.contributor_id)         AS reporter_count,
                     MIN(f.created_at)                        AS first_reported,
                     MAX(f.created_at)                        AS last_reported,
-                    f.enclosure_id,
+                    f.enclosure_species_id,
                     e.name                                   AS enclosure_name,
                     f.value_time,
                     f.value_latitude,
@@ -287,7 +288,8 @@ def get_feedback(zoo):
                 FROM zoo.feedback f
                 JOIN zoo.zoos z             ON z.id  = f.zoo_id
                 JOIN zoo.feedback_types ft  ON ft.id = f.feedback_type_id
-                LEFT JOIN zoo.enclosures e  ON e.id  = f.enclosure_id
+                LEFT JOIN zoo.enclosure_species es ON es.id = f.enclosure_species_id
+                LEFT JOIN zoo.enclosures e  ON e.id  = es.enclosure_id
                 LEFT JOIN zoo.species s     ON s.id  = f.value_species_id
                 LEFT JOIN zoo.feedback_report_reasons rr ON rr.id = f.value_report_reason_id
                 WHERE z.slug = %s
@@ -295,7 +297,7 @@ def get_feedback(zoo):
                   AND ft.requires_admin_review = TRUE
                 GROUP BY
                     ft.id, ft.slug, ft.label_de,
-                    f.enclosure_id, e.name,
+                    f.enclosure_species_id, e.name,
                     f.value_time, f.value_latitude, f.value_longitude,
                     f.value_wikidata_id, f.value_species_id,
                     s.german_name, s.latin_name,
@@ -317,7 +319,7 @@ def get_feedback(zoo):
                     WHERE z.slug = %s AND f.status = %s
                       AND ft.requires_admin_review = TRUE
                     GROUP BY
-                        ft.id, f.enclosure_id,
+                        ft.id, f.enclosure_species_id,
                         f.value_time, f.value_latitude, f.value_longitude,
                         f.value_wikidata_id, f.value_species_id,
                         f.value_date, f.value_count,
@@ -368,7 +370,7 @@ def get_feedback_item(zoo, feedback_id):
                     f.review_comment, f.reviewed_at, f.reviewed_by, f.created_at,
                     ft.slug       AS feedback_type_slug,
                     ft.label_de   AS feedback_type_label,
-                    f.enclosure_id,
+                    f.enclosure_species_id,
                     e.name        AS enclosure_name,
                     f.value_time, f.value_latitude, f.value_longitude,
                     f.value_wikidata_id, f.value_species_id,
@@ -382,7 +384,8 @@ def get_feedback_item(zoo, feedback_id):
                 FROM zoo.feedback f
                 JOIN zoo.zoos z             ON z.id  = f.zoo_id
                 JOIN zoo.feedback_types ft  ON ft.id = f.feedback_type_id
-                LEFT JOIN zoo.enclosures e  ON e.id  = f.enclosure_id
+                LEFT JOIN zoo.enclosure_species es ON es.id = f.enclosure_species_id
+                LEFT JOIN zoo.enclosures e  ON e.id  = es.enclosure_id
                 LEFT JOIN zoo.species s     ON s.id  = f.value_species_id
                 LEFT JOIN zoo.feedback_report_reasons rr ON rr.id = f.value_report_reason_id
                 WHERE z.slug = %s AND f.id = %s

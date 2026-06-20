@@ -145,22 +145,36 @@ def created_species_id(base_url, jwt_headers):
     """
     Legt einmalig eine Test-Species an und gibt die ID zurück.
     Migration v7: wikidata_id ist Pflicht für direktes Anlegen.
-    Verwendet Q999999 (Dummy-Wikidata-ID für Tests).
+
+    wikidata_id ist pro Testlauf eindeutig (statt fest "Q999999") und wird
+    am Ende der Session wieder gelöscht — sonst schlägt die Anlage beim
+    nächsten Lauf an der UNIQUE-Constraint auf wikidata_id fehl, weil die
+    Species vom letzten Mal noch in der DB liegt.
+
+    Bereich Q900000000+ statt eines kleinen Zufallswerts: Wikidata hat
+    aktuell ~122 Mio. echte Items (Stand 2026) — ein kleinerer Zufallsbereich
+    könnte mit einer realen ID kollidieren. Q900000000+ liegt mit großem
+    Sicherheitsabstand darüber und bleibt es auch bei weiterem Wachstum.
     """
+    wikidata_id = f"Q{900_000_000 + (uuid.uuid4().int % 99_000_000)}"
     resp = requests.post(
         f"{base_url}/api/v1/species",
         headers=jwt_headers,
         json={
             "german_name": "Pytest-Testtier",
             "latin_name":  "Testus pytestus",
-            "wikidata_id": "Q999999",   # Migration v7: wikidata_id Pflicht
+            "wikidata_id": wikidata_id,   # Migration v7: wikidata_id Pflicht
             "zoo_slug":    os.getenv("TEST_ZOO", "zoo_berlin"),
         }
     )
     if resp.status_code == 403:
         pytest.skip("Kein write_permission für Species-Anlage")
     assert resp.status_code == 201, f"Species anlegen fehlgeschlagen: {resp.text}"
-    return resp.json()["id"]
+    species_id = resp.json()["id"]
+
+    yield species_id
+
+    requests.delete(f"{base_url}/api/v1/species/{species_id}", headers=jwt_headers)
 
 
 @pytest.fixture(scope="session")

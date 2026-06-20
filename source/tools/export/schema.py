@@ -179,7 +179,7 @@ CREATE TABLE IF NOT EXISTS species_texts (
 
 CREATE TABLE IF NOT EXISTS enclosure_species (
     id             INTEGER PRIMARY KEY,
-    enclosure_id   INTEGER NOT NULL,
+    enclosure_id   INTEGER,
     species_id     INTEGER NOT NULL,
     note           TEXT,
     count_adult    INTEGER,
@@ -189,25 +189,25 @@ CREATE TABLE IF NOT EXISTS enclosure_species (
 );
 
 CREATE TABLE IF NOT EXISTS feeding_times (
-    id           INTEGER PRIMARY KEY,
-    enclosure_id INTEGER NOT NULL,
-    species_id   INTEGER,
-    feeding_time TEXT NOT NULL,
-    day_of_week  INTEGER,
-    note         TEXT,
-    is_public    INTEGER DEFAULT 1
+    id                  INTEGER PRIMARY KEY,
+    enclosure_species_id INTEGER NOT NULL,
+    species_id          INTEGER,
+    feeding_time        TEXT NOT NULL,
+    day_of_week         INTEGER,
+    note                TEXT,
+    is_public           INTEGER DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS births (
-    id           INTEGER PRIMARY KEY,
-    zoo_id       INTEGER NOT NULL,
-    enclosure_id INTEGER,
-    species_id   INTEGER,
-    birth_date   TEXT,
-    count        INTEGER,
-    note         TEXT,
-    is_public    INTEGER DEFAULT 1,
-    created_at   TEXT
+    id                  INTEGER PRIMARY KEY,
+    zoo_id              INTEGER NOT NULL,
+    enclosure_species_id INTEGER,
+    species_id          INTEGER,
+    birth_date          TEXT,
+    count               INTEGER,
+    note                TEXT,
+    is_public           INTEGER DEFAULT 1,
+    created_at          TEXT
 );
 
 CREATE TABLE IF NOT EXISTS geo_points (
@@ -263,7 +263,7 @@ CREATE INDEX IF NOT EXISTS idx_media_wikidata         ON media(wikidata_id);
 CREATE INDEX IF NOT EXISTS idx_opening_hours_loc      ON opening_hours(location_id);
 CREATE INDEX IF NOT EXISTS idx_house_oh_house         ON house_opening_hours(house_id);
 CREATE INDEX IF NOT EXISTS idx_zoo_oh_zoo             ON zoo_opening_hours(zoo_id);
-CREATE INDEX IF NOT EXISTS idx_feeding_enclosure      ON feeding_times(enclosure_id);
+CREATE INDEX IF NOT EXISTS idx_feeding_enclosure      ON feeding_times(enclosure_species_id);
 CREATE INDEX IF NOT EXISTS idx_location_species_loc   ON location_species(location_id);
 CREATE INDEX IF NOT EXISTS idx_location_species_sp    ON location_species(species_id);
 CREATE INDEX IF NOT EXISTS idx_taxonomy_wikidata      ON taxonomy(wikidata_id);

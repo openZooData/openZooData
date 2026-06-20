@@ -123,7 +123,7 @@ def test_feedback_types_structure(base_url, app_token_headers):
     types = {t["id"]: t for t in resp.json()}
     assert types[1]["slug"] == "feeding_time"
     assert types[1]["requires_admin_review"] is True
-    assert types[8]["slug"] == "report"
+    assert types[8]["slug"] == "text_incorrect"
     assert types[9]["requires_admin_review"] is False
 
 

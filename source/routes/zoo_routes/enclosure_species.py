@@ -24,6 +24,7 @@ from helpers.authz import require_zoo_access
 from helpers.coordinates import is_valid_slug, round_coordinates
 from db import get_pg_connection
 from extensions import limiter
+from storage import storage
 
 enclosure_species_bp = Blueprint("enclosure_species", __name__)
 
@@ -89,8 +90,24 @@ def get_enclosures(zoo):
                     gp.longitude,
                     ms.storage_path || ms.filename AS species_icon_path,
                     mimg.storage_path || mimg.filename AS image_path,
-                    ARRAY_AGG(ft.feeding_time::TEXT ORDER BY ft.feeding_time)
-                        FILTER (WHERE ft.feeding_time IS NOT NULL) AS feeding_times
+                    (
+                        SELECT ARRAY_AGG(ft.feeding_time::TEXT ORDER BY ft.feeding_time)
+                        FROM zoo.feeding_times ft
+                        WHERE ft.enclosure_species_id = es.id
+                    ) AS feeding_times,
+                    (
+                        SELECT JSON_AGG(
+                            json_build_object(
+                                'id', b.id,
+                                'birth_date', b.birth_date::TEXT,
+                                'count', b.count,
+                                'note', b.note,
+                                'is_public', b.is_public
+                            ) ORDER BY b.birth_date DESC
+                        )
+                        FROM zoo.births b
+                        WHERE b.enclosure_species_id = es.id
+                    ) AS births
                 FROM zoo.enclosure_species es
                 JOIN zoo.species s ON s.id = es.species_id
                 LEFT JOIN zoo.enclosures e ON e.id = es.enclosure_id
@@ -101,19 +118,7 @@ def get_enclosures(zoo):
                       AND gp.entity_id = es.id
                 LEFT JOIN zoo.media ms ON ms.id = s.icon_media_id
                 LEFT JOIN zoo.media mimg ON mimg.id = e.image_media_id
-                LEFT JOIN zoo.feeding_times ft
-                       ON ft.enclosure_species_id = es.id
                 WHERE {where}
-                GROUP BY
-                    es.id, es.species_id, es.enclosure_id, es.house_id,
-                    es.note, es.count_adult, es.count_juvenile, es.counted_at, es.domain_id,
-                    s.german_name, s.latin_name, s.wikidata_id,
-                    s.iucn_status_id, s.iucn_id, s.gbif_taxon_key,
-                    e.name, e.sort_order, e.domain_id,
-                    h.name, h.domain_id,
-                    gp.latitude, gp.longitude,
-                    ms.storage_path, ms.filename,
-                    mimg.storage_path, mimg.filename
                 ORDER BY s.german_name
             """, params)
             results = cur.fetchall()
@@ -139,7 +144,8 @@ def create_enclosure(zoo):
         count_juvenile,      ← optional
         latitude,            ← optional
         longitude,           ← optional
-        feeding_times        ← optional ["14:00", "16:00"]
+        feeding_times,       ← optional ["14:00", "16:00"]
+        births               ← optional [{"birth_date": "2026-03-01", "count": 2, "note": "...", "is_public": true}]
     }
     """
     if not is_valid_slug(zoo):
@@ -158,6 +164,7 @@ def create_enclosure(zoo):
     longitude      = data.get("longitude")
     domain_id      = data.get("domain_id")
     feeding_times  = data.get("feeding_times", [])
+    births         = data.get("births", [])
 
     if not species_id:
         return jsonify({"error": "species_id required"}), 400
@@ -231,6 +238,20 @@ def create_enclosure(zoo):
                     VALUES (%s, %s)
                 """, (es_id, t))
 
+            # Geburten (species_id/zoo_id kommen aus dem Parent-Kontext,
+            # der Client schickt sie nicht mit)
+            for b in births:
+                if not b.get("birth_date"):
+                    return jsonify({"error": "birth_date required for births entry"}), 400
+                cur.execute("""
+                    INSERT INTO zoo.births
+                        (enclosure_species_id, species_id, zoo_id,
+                        birth_date, count, note, is_public)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (es_id, species_id, zoo_id,
+                    b.get("birth_date"), b.get("count", 1),
+                    b.get("note"), b.get("is_public", True)))
+
         pg.commit()
         return jsonify({"id": es_id, "message": "Created"}), 201
     except Exception:
@@ -246,7 +267,7 @@ def update_enclosure(zoo, es_id):
     """
     enclosure_species bearbeiten.
     Erlaubte Felder: enclosure_id, house_id, note, count_adult,
-                     count_juvenile, latitude, longitude, feeding_times
+                     count_juvenile, latitude, longitude, feeding_times, births
     """
     if not is_valid_slug(zoo):
         return jsonify({"error": "Invalid zoo identifier"}), 400
@@ -256,7 +277,7 @@ def update_enclosure(zoo, es_id):
     data = request.get_json(silent=True) or {}
 
     ALLOWED = {"enclosure_id", "house_id", "domain_id", "note", "count_adult",
-               "count_juvenile", "latitude", "longitude", "feeding_times"}
+               "count_juvenile", "latitude", "longitude", "feeding_times", "births"}
     unknown = set(data.keys()) - ALLOWED
     if unknown:
         return jsonify({"error": f"Unknown fields: {', '.join(sorted(unknown))}"}), 400
@@ -266,6 +287,7 @@ def update_enclosure(zoo, es_id):
     latitude      = data.pop("latitude", None)
     longitude     = data.pop("longitude", None)
     feeding_times = data.pop("feeding_times", None)
+    births        = data.pop("births", None)
 
     pg = None
     try:
@@ -273,15 +295,18 @@ def update_enclosure(zoo, es_id):
         with pg.cursor() as cur:
 
             # Prüfen ob enclosure_species zum Zoo gehört
+            # (species_id/zoo_id gleich mit holen, falls births aktualisiert werden)
             cur.execute("""
-                SELECT es.id FROM zoo.enclosure_species es
+                SELECT es.id, es.species_id, es.zoo_id FROM zoo.enclosure_species es
                 LEFT JOIN zoo.enclosures e ON e.id = es.enclosure_id
                 LEFT JOIN zoo.houses h ON h.id = es.house_id
                 LEFT JOIN zoo.zoos z ON z.id = es.zoo_id
                 WHERE es.id = %s AND z.slug = %s
             """, (es_id, zoo))
-            if not cur.fetchone():
+            es_row = cur.fetchone()
+            if not es_row:
                 return jsonify({"error": "Not found"}), 404
+            es_species_id, es_zoo_id = es_row[1], es_row[2]
 
             # Felder updaten
             if data:
@@ -320,6 +345,25 @@ def update_enclosure(zoo, es_id):
                         VALUES (%s, %s)
                     """, (es_id, t))
 
+            # Geburten (species_id/zoo_id kommen aus dem Parent-Kontext,
+            # der Client schickt sie nicht mit)
+            if births is not None:
+                cur.execute("""
+                    DELETE FROM zoo.births
+                    WHERE enclosure_species_id = %s
+                """, (es_id,))
+                for b in births:
+                    if not b.get("birth_date"):
+                        return jsonify({"error": "birth_date required for births entry"}), 400
+                    cur.execute("""
+                        INSERT INTO zoo.births
+                            (enclosure_species_id, species_id, zoo_id,
+                            birth_date, count, note, is_public)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    """, (es_id, es_species_id, es_zoo_id,
+                        b.get("birth_date"), b.get("count", 1),
+                        b.get("note"), b.get("is_public", True)))
+
         pg.commit()
         return jsonify({"message": "Updated"}), 200
     except Exception:
@@ -332,7 +376,16 @@ def update_enclosure(zoo, es_id):
 @enclosure_species_bp.route("/api/v1/zoos/<zoo>/enclosure_species/<int:es_id>", methods=["DELETE"])
 @limiter.limit("10 per minute")
 def delete_enclosure(zoo, es_id):
-    """enclosure_species löschen."""
+    """
+    enclosure_species löschen.
+
+    feeding_times werden per ON DELETE CASCADE automatisch mitgelöscht.
+    births bleiben erhalten (ON DELETE SET NULL) — historisches Faktum,
+    überlebt die Auflösung der enclosure_species.
+    geo_points und media sind polymorph (entity_type/entity_id) und haben
+    deshalb keine FK-Constraint — die räumen wir hier explizit auf, inkl.
+    der physischen Datei bei media.
+    """
     if not is_valid_slug(zoo):
         return jsonify({"error": "Invalid zoo identifier"}), 400
     user_id, err = require_zoo_access(zoo, "write")
@@ -341,23 +394,43 @@ def delete_enclosure(zoo, es_id):
     pg = None
     try:
         pg = get_pg_connection()
-        with pg.cursor() as cur:
+        with pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+
+            # Ownership-Check über es.zoo_id direkt — unabhängig davon, ob
+            # eine enclosure_id/house_id gesetzt ist. Schließt die alte
+            # Tenant-Isolation-Lücke im Fallback-Zweig.
             cur.execute("""
-                DELETE FROM zoo.enclosure_species es
-                USING zoo.enclosures e, zoo.zoos z
-                WHERE es.id = %s
-                AND e.id = es.enclosure_id
-                AND z.id = e.zoo_id
-                AND z.slug = %s
+                SELECT id FROM zoo.enclosure_species
+                WHERE id = %s AND zoo_id = (SELECT id FROM zoo.zoos WHERE slug = %s)
             """, (es_id, zoo))
-            if cur.rowcount == 0:
-                # Auch ohne Enclosure löschen (nur house_id oder ohne Zuordnung)
-                cur.execute("""
-                    DELETE FROM zoo.enclosure_species
-                    WHERE id = %s
-                """, (es_id,))
-                if cur.rowcount == 0:
-                    return jsonify({"error": "Not found"}), 404
+            if not cur.fetchone():
+                return jsonify({"error": "Not found"}), 404
+
+            # Verwaiste media-Dateien aufräumen (physische Datei + Zeile)
+            cur.execute("""
+                SELECT storage_path FROM zoo.media
+                WHERE entity_type = 'enclosure_species' AND entity_id = %s
+            """, (es_id,))
+            media_rows = cur.fetchall()
+            for m in media_rows:
+                storage.delete(m["storage_path"])
+            cur.execute("""
+                DELETE FROM zoo.media
+                WHERE entity_type = 'enclosure_species' AND entity_id = %s
+            """, (es_id,))
+
+            # Verwaiste geo_points aufräumen
+            cur.execute("""
+                DELETE FROM zoo.geo_points
+                WHERE entity_type = 'enclosure_species' AND entity_id = %s
+            """, (es_id,))
+
+            # enclosure_species selbst löschen
+            # (feeding_times CASCADE, births SET NULL passiert automatisch über die DB)
+            cur.execute("""
+                DELETE FROM zoo.enclosure_species WHERE id = %s
+            """, (es_id,))
+
         pg.commit()
         return jsonify({"message": "Deleted"}), 200
     except Exception:

@@ -13,7 +13,7 @@ import psycopg2.extras
 from flask import Blueprint, jsonify, request
 from db import get_pg_connection
 from extensions import limiter
-from helpers.authz import require_authenticated, require_super_admin, require_zoo_access
+from helpers.authz import require_authenticated, require_super_admin, require_zoo_access, require_any_write_access
 
 species_bp = Blueprint("species", __name__)
 
@@ -116,7 +116,7 @@ def create_species():
     Auth: JWT mit zoo_admin oder editor Rolle auf irgendeinem Zoo.
     Body: { german_name, latin_name, wikidata_id }
     """
-    user_id, err = require_authenticated()
+    user_id, err = require_any_write_access()
     if err: return err
 
     data        = request.get_json(silent=True) or {}
@@ -216,7 +216,9 @@ def update_species(species_id):
 def delete_species(species_id):
     """
     Species löschen — nur super_admin.
-    Schlägt fehl wenn noch enclosure_species verknüpft sind.
+    Schlägt fehl wenn noch enclosure_species ODER births verknüpft sind.
+    (births.species_id hat keine ON DELETE-Klausel — ohne diese Prüfung
+    würde der DELETE an der FK-Constraint crashen statt sauber 409 zu geben.)
     """
     actor_id, err = require_super_admin()
     if err: return err
@@ -234,6 +236,18 @@ def delete_species(species_id):
             if count > 0:
                 return jsonify({
                     "error": f"Cannot delete: {count} enclosure_species verknüpft"
+                }), 409
+
+            # Prüfen ob noch births vorhanden — births_species_id_fkey hat
+            # kein ON DELETE, würde sonst als FK-Violation einen 500 auslösen
+            cur.execute("""
+                SELECT COUNT(*) FROM zoo.births
+                WHERE species_id = %s
+            """, (species_id,))
+            births_count = cur.fetchone()[0]
+            if births_count > 0:
+                return jsonify({
+                    "error": f"Cannot delete: {births_count} births verknüpft"
                 }), 409
 
             cur.execute("DELETE FROM zoo.species WHERE id = %s", (species_id,))

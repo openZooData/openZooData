@@ -4,7 +4,8 @@ import psycopg2.extras
 from flask import Blueprint, jsonify, request
 from db import get_pg_connection, get_auth_connection
 from extensions import limiter
-from helpers.authz import require_super_admin
+from helpers.authz import require_super_admin, get_user_id_from_token
+from helpers.audit import log_action
 from helpers.coordinates import is_valid_slug
 from routes.admin_routes.helpers import (_can_manage_tenant, _get_zoo_id_by_slug,
     _is_super_admin)

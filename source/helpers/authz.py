@@ -184,3 +184,64 @@ def require_authenticated():
     if not user_id:
         return None, (jsonify({"error": "Unauthorized"}), 403)
     return user_id, None
+
+
+def require_any_write_access():
+    """
+    Für globale (zoo-übergreifende) Schreib-Endpoints wie das Anlegen einer
+    neuen Species — es gibt keinen einzelnen zoo_slug, gegen den man prüfen
+    könnte. Erlaubt, wer mindestens irgendwo write-Rechte hat:
+    super_admin, tenant_admin (eines beliebigen Tenants), oder zoo_admin/
+    editor auf mindestens einem Zoo. viewer-only User werden abgelehnt.
+    """
+    from flask import jsonify
+    from db import get_auth_connection
+    user_id = get_user_id_from_token()
+    if not user_id:
+        return None, (jsonify({"error": "Unauthorized"}), 403)
+
+    conn = None
+    try:
+        conn = get_auth_connection()
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT u.is_active, t.is_active
+                FROM auth.users u
+                LEFT JOIN auth.tenants t ON t.id = u.tenant_id
+                WHERE u.id = %s
+            """, (user_id,))
+            row = cur.fetchone()
+            if not row or not row[0]:
+                return None, (jsonify({"error": "Unauthorized"}), 403)
+            if row[1] is False:
+                return None, (jsonify({"error": "Unauthorized"}), 403)
+
+            cur.execute("""
+                SELECT 1 FROM auth.user_global_roles
+                WHERE user_id = %s AND role = 'super_admin'
+            """, (user_id,))
+            if cur.fetchone():
+                return user_id, None
+
+            cur.execute("""
+                SELECT 1 FROM auth.user_tenant_roles
+                WHERE user_id = %s AND role = 'tenant_admin' AND is_active = TRUE
+            """, (user_id,))
+            if cur.fetchone():
+                return user_id, None
+
+            cur.execute("""
+                SELECT 1 FROM auth.user_zoo_roles
+                WHERE user_id = %s AND role IN ('zoo_admin', 'editor')
+                  AND is_active = TRUE
+            """, (user_id,))
+            if cur.fetchone():
+                return user_id, None
+
+        return None, (jsonify({"error": "Unauthorized"}), 403)
+    except Exception:
+        logging.exception("require_any_write_access: DB-Fehler — fail-closed")
+        return None, (jsonify({"error": "Internal server error"}), 500)
+    finally:
+        if conn:
+            conn.close()

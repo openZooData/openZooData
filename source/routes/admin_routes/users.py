@@ -1,10 +1,15 @@
 import logging
+import os
+import hashlib
+import secrets as secrets_module
+import bcrypt
 import psycopg2
 import psycopg2.extras
 from flask import Blueprint, jsonify, request
 from db import get_pg_connection, get_auth_connection
 from extensions import limiter
 from helpers.authz import require_super_admin
+from helpers.audit import log_action
 from helpers.coordinates import is_valid_slug
 from routes.admin_routes.helpers import (_would_remove_last_super_admin,
     _is_super_admin)
@@ -219,6 +224,9 @@ def _send_reset_email(email: str, display_name: str | None,
     if not smtp_host or not smtp_user:
         logging.warning("SMTP nicht konfiguriert — Reset-Mail nicht versendet")
         return False
+
+    import smtplib
+    from email.mime.text import MIMEText
 
     name = display_name or email
     msg  = MIMEText(
