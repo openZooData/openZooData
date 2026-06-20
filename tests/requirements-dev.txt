@@ -3,3 +3,4 @@ pytest-cov
 requests
 python-dotenv
 Pillow
+PyJWT==2.12.1
