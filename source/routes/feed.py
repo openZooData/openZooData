@@ -17,7 +17,7 @@ import os
 import logging
 from datetime import datetime, timezone
 from email.utils import formatdate
-from flask import Blueprint, Response, request, jsonify
+from flask import Blueprint, Response, jsonify
 from helpers.coordinates import is_valid_slug
 from db import get_pg_connection
 from extensions import limiter

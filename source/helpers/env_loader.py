@@ -37,6 +37,6 @@ def load_env() -> Path:
             return path
 
     raise RuntimeError(
-        f"Keine .env-Datei gefunden. Gesucht in:\n"
+        "Keine .env-Datei gefunden. Gesucht in:\n"
         + "\n".join(f"  {p}" for p in candidates)
     )

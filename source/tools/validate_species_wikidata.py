@@ -150,7 +150,7 @@ def generate_sql(valid_ids: List[int]) -> str:
         "SET search_path TO zoo, public;",
         "BEGIN;",
         "",
-        f"UPDATE species SET id_valid = TRUE",
+        "UPDATE species SET id_valid = TRUE",
         f"WHERE id IN ({', '.join(map(str, valid_ids))});",
         "",
         "-- Prüfung",
@@ -254,7 +254,7 @@ def main():
 
         # Entscheidung
         if label_ok and latin_ok:
-            print(f"✅")
+            print("✅")
             valid_ids.append(s["id"])
         else:
             print(f"⚠️  {' | '.join(problems)}")

@@ -101,7 +101,7 @@ def get_wikidata_label_de(wikidata_id: str) -> Optional[str]:
         entity = data.get("entities", {}).get(wikidata_id, {})
         label = entity.get("labels", {}).get("de", {}).get("value")
         return label
-    except Exception as e:
+    except Exception:
         return None
 
 # ─── Datenbank ────────────────────────────────────────────────────────────────

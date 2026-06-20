@@ -287,7 +287,7 @@ def main():
     print(f"⚠️  Abweichungen:     {stats['deviations']}")
     print(f"⚠️  Fehlend in DB:    {stats['missing_db']}")
     print(f"⚠️  Kein Wiki-Label:  {stats['missing_wiki']}")
-    print(f"─────────────────────────────")
+    print("─────────────────────────────")
     print(f"   Gesamt Probleme:  {total_issues}")
 
     # Report

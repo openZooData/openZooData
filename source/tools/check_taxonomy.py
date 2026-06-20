@@ -11,13 +11,11 @@ Aufruf:
     python3 tools/check_taxonomy.py --dry-run # nur prüfen
 """
 
-import sys
 import argparse
 import requests
 import psycopg2
 import psycopg2.extras
 from pathlib import Path
-from typing import Dict
 import time
 
 def load_env():

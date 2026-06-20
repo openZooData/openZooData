@@ -6,13 +6,11 @@ import bcrypt
 import psycopg2
 import psycopg2.extras
 from flask import Blueprint, jsonify, request
-from db import get_pg_connection, get_auth_connection
+from db import get_auth_connection
 from extensions import limiter
 from helpers.authz import require_super_admin
 from helpers.audit import log_action
-from helpers.coordinates import is_valid_slug
-from routes.admin_routes.helpers import (_would_remove_last_super_admin,
-    _is_super_admin)
+from routes.admin_routes.helpers import (_would_remove_last_super_admin)
 
 admin_users_bp = Blueprint("admin_users_bp", __name__)
 

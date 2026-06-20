@@ -1,12 +1,9 @@
 import logging
-import psycopg2
-import psycopg2.extras
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify
 from db import get_pg_connection, get_auth_connection
 from extensions import limiter
 from helpers.authz import require_super_admin
 from helpers.audit import log_action
-from helpers.coordinates import is_valid_slug
 
 admin_fixtures_bp = Blueprint("admin_fixtures_bp", __name__)
 

@@ -3,7 +3,6 @@ import psycopg2.extras
 from flask import Blueprint, jsonify, request
 from db import get_pg_connection
 from extensions import limiter
-from helpers.coordinates import is_valid_slug
 from helpers.authz import require_authenticated, require_super_admin
 
 location_types_bp = Blueprint("location_types_bp", __name__)
@@ -12,7 +11,6 @@ location_types_bp = Blueprint("location_types_bp", __name__)
 @limiter.limit("60 per minute")
 def get_location_types():
     """Alle Location-Typen — lesbar für alle JWT-User."""
-    from helpers.authz import require_authenticated
     user_id, err = require_authenticated()
     if err: return err
 
@@ -38,7 +36,6 @@ def get_location_types():
 @limiter.limit("60 per minute")
 def get_location_type(type_id):
     """Einzelner Location-Typ."""
-    from helpers.authz import require_authenticated
     user_id, err = require_authenticated()
     if err: return err
 
@@ -66,7 +63,6 @@ def get_location_type(type_id):
 @limiter.limit("30 per minute")
 def create_location_type():
     """Location-Typ anlegen — nur super_admin."""
-    from helpers.authz import require_super_admin
     actor_id, err = require_super_admin()
     if err: return err
 
@@ -112,7 +108,6 @@ def create_location_type():
 @limiter.limit("30 per minute")
 def update_location_type(type_id):
     """Location-Typ bearbeiten — nur super_admin."""
-    from helpers.authz import require_super_admin
     actor_id, err = require_super_admin()
     if err: return err
 
@@ -166,7 +161,6 @@ def delete_location_type(type_id):
     Location-Typ löschen — nur super_admin.
     Schlägt fehl wenn noch Locations diesen Typ verwenden.
     """
-    from helpers.authz import require_super_admin
     actor_id, err = require_super_admin()
     if err: return err
 

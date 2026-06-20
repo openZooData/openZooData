@@ -25,14 +25,13 @@ Output:
 """
 
 import sys
-import re
 import time
 import argparse
 import requests
 import psycopg2
 from pathlib import Path
 from datetime import datetime
-from typing import Optional, Dict, List, Tuple
+from typing import Dict, List
 
 # ─── Konfiguration ────────────────────────────────────────────────────────────
 
@@ -155,7 +154,7 @@ def fetch_species_data(wikidata_id: str) -> Dict:
 
         return result
 
-    except Exception as e:
+    except Exception:
         time.sleep(API_DELAY)
         return {}
 
@@ -202,7 +201,7 @@ def generate_sql(results: List[Dict]) -> str:
             return f"'{escape(str(v))}'" if v is not None else "NULL"
 
         lines.append(f"-- {r['name']} ({r['wikidata_id']})")
-        lines.append(f"UPDATE species SET")
+        lines.append("UPDATE species SET")
         lines.append(f"    tax_kingdom_id           = {val(r.get('tax_kingdom_id'))},")
         lines.append(f"    tax_phylum_id            = {val(r.get('tax_phylum_id'))},")
         lines.append(f"    tax_class_id             = {val(r.get('tax_class_id'))},")
@@ -213,7 +212,7 @@ def generate_sql(results: List[Dict]) -> str:
         lines.append(f"    iucn_population_trend_id = {val(r.get('iucn_population_trend_id'))},")
         lines.append(f"    iucn_id                  = {val(r.get('iucn_id'))},")
         lines.append(f"    gbif_taxon_key           = {val(r.get('gbif_taxon_key'))},")
-        lines.append(f"    wiki_fetched_at          = NOW()")
+        lines.append("    wiki_fetched_at          = NOW()")
         lines.append(f"WHERE id = {r['id']};")
         lines.append("")
 
@@ -327,9 +326,9 @@ def main():
         sql_path = Path(__file__).parent / "enrich_species.sql"
         sql_path.write_text(sql, encoding="utf-8")
         print(f"\n📄 SQL: {sql_path}")
-        print(f"\nNächster Schritt:")
-        print(f"  → enrich_species.sql in Postico einspielen")
-        print(f"  → python3 tools/export_sqlite.py --all  (SQLite neu generieren)")
+        print("\nNächster Schritt:")
+        print("  → enrich_species.sql in Postico einspielen")
+        print("  → python3 tools/export_sqlite.py --all  (SQLite neu generieren)")
 
     print("\n✅ Fertig!")
 

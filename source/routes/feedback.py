@@ -70,7 +70,6 @@ def get_device_key():
     Verhindert Bypass durch Rotation der client-gewählten contributor_id.
     Fallback auf IP wenn kein Token vorhanden (sollte nie eintreten da Auth bereits prüft).
     """
-    from helpers.auth_utils import require_app_token
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
         import hashlib
@@ -117,7 +116,7 @@ def get_feedback_types():
         response.headers["Cache-Control"] = "public, max-age=3600"
         return response, 200
 
-    except Exception as e:
+    except Exception:
         logging.exception("Exception in GET feedback-types")
         return jsonify({"error": "Internal server error"}), 500
     finally:
@@ -226,7 +225,7 @@ def create_feedback(zoo):
 
     except psycopg2.errors.UniqueViolation:
         return jsonify({"error": "Already rated"}), 409
-    except Exception as e:
+    except Exception:
         logging.exception("Exception in POST feedback")
         return jsonify({"error": "Internal server error"}), 500
     finally:
@@ -342,7 +341,7 @@ def get_feedback(zoo):
 
         return jsonify({"total": total, "clusters": clusters}), 200
 
-    except Exception as e:
+    except Exception:
         logging.exception("Exception in GET feedback")
         return jsonify({"error": "Internal server error"}), 500
     finally:
@@ -403,7 +402,7 @@ def get_feedback_item(zoo, feedback_id):
             d["value_time"] = str(d["value_time"])
         return jsonify(d), 200
 
-    except Exception as e:
+    except Exception:
         logging.exception(f"Exception in GET feedback/{feedback_id}")
         return jsonify({"error": "Internal server error"}), 500
     finally:
@@ -453,7 +452,7 @@ def accept_feedback(zoo, feedback_id):
         pg.commit()
         return jsonify({"message": "Accepted", "updated_count": updated}), 200
 
-    except Exception as e:
+    except Exception:
         logging.exception(f"Exception in accept_feedback/{feedback_id}")
         return jsonify({"error": "Internal server error"}), 500
     finally:
@@ -498,7 +497,7 @@ def reject_feedback(zoo, feedback_id):
         pg.commit()
         return jsonify({"message": "Rejected", "updated_count": updated}), 200
 
-    except Exception as e:
+    except Exception:
         logging.exception(f"Exception in reject_feedback/{feedback_id}")
         return jsonify({"error": "Internal server error"}), 500
     finally:

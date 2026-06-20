@@ -235,7 +235,7 @@ def generate_sql(confirmed: List[Dict]) -> str:
         species_id  = m["location_id"]
         name        = escape(m["name"])
         lines.append(f"-- {name} → {wikidata_id} ({latin})")
-        lines.append(f"UPDATE species")
+        lines.append("UPDATE species")
         lines.append(f"  SET wikidata_id = '{wikidata_id}',")
         lines.append(f"      latin_name  = '{latin}'")
         lines.append(f"  WHERE id = {species_id};")

@@ -13,7 +13,7 @@ import psycopg2.extras
 from flask import Blueprint, jsonify, request
 from db import get_pg_connection
 from extensions import limiter
-from helpers.authz import require_authenticated, require_super_admin, require_zoo_access, require_any_write_access
+from helpers.authz import require_authenticated, require_super_admin, require_any_write_access
 
 species_bp = Blueprint("species", __name__)
 

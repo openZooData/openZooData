@@ -6,7 +6,6 @@ from mimetypes import guess_type
 from flask import Blueprint, jsonify, request, send_file
 
 from helpers.authz import require_zoo_access
-from helpers.coordinates import is_valid_slug
 from db import get_pg_connection
 from extensions import limiter
 from storage import storage, STORAGE_DIR

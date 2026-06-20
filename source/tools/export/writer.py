@@ -46,7 +46,7 @@ def _do_export(pg, zoo_id: int, slug: str, output_path: Path):
         db = sqlite3.connect(str(tmp_sqlite))
         db.executescript(SCHEMA)
 
-        print(f"   Lade Daten aus PostgreSQL...")
+        print("   Lade Daten aus PostgreSQL...")
         zoo_row           = fetch_zoo(pg, zoo_id)
         zoo_opening_hrs   = fetch_zoo_opening_hours(pg, zoo_id)
         domains           = fetch_domains(pg, zoo_id)
@@ -70,7 +70,7 @@ def _do_export(pg, zoo_id: int, slug: str, output_path: Path):
         media             = fetch_media(pg, zoo_id)
         pg.commit()  # read-Transaktion beenden
 
-        print(f"   Schreibe SQLite...")
+        print("   Schreibe SQLite...")
         db.execute(
             "INSERT OR REPLACE INTO zoos VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             zoo_row
@@ -104,7 +104,7 @@ def _do_export(pg, zoo_id: int, slug: str, output_path: Path):
 
         # Statistik
         db = sqlite3.connect(str(tmp_sqlite))
-        print(f"   Statistik:")
+        print("   Statistik:")
         for table in STATS_TABLES:
             count = db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
             if count > 0:

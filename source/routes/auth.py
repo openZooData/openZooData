@@ -9,7 +9,7 @@ from datetime import datetime, timezone, timedelta
 from flask import Blueprint, jsonify, request
 from helpers.auth_utils import (
     verify_access_token, create_access_token,
-    JWT_SECRET, REFRESH_EXPIRY_DAYS, _get_setting_int
+    REFRESH_EXPIRY_DAYS, _get_setting_int
 )
 from helpers.audit import log_action
 from helpers.authz import require_super_admin

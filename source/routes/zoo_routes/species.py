@@ -1,7 +1,7 @@
 import logging
 import psycopg2.extras
 from flask import Blueprint, jsonify, request
-from helpers.authz import require_authenticated, require_zoo_access, require_super_admin
+from helpers.authz import require_authenticated, require_super_admin
 from db import get_pg_connection
 from extensions import limiter
 

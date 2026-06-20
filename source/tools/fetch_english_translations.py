@@ -160,7 +160,7 @@ def main():
         print("\n✅ Alle englischen Übersetzungen bereits vorhanden!")
         sys.exit(0)
 
-    print(f"\n🔍 Rufe Wikidata-Labels ab...")
+    print("\n🔍 Rufe Wikidata-Labels ab...")
     print()
 
     updates   = []

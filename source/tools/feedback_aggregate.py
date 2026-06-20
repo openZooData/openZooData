@@ -15,7 +15,6 @@ Ausführen:
 """
 
 import os
-import sys
 import argparse
 import logging
 from dotenv import load_dotenv

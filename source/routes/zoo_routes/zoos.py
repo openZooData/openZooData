@@ -1,6 +1,6 @@
 import logging
 import psycopg2.extras
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify
 from db import get_pg_connection
 from extensions import limiter
 from helpers.coordinates import is_valid_slug

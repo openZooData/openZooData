@@ -1,8 +1,6 @@
 import logging
-import psycopg2
-import psycopg2.extras
 from flask import Blueprint, jsonify, request
-from db import get_pg_connection, get_auth_connection
+from db import get_auth_connection
 from extensions import limiter
 from helpers.authz import require_super_admin, get_user_id_from_token
 from helpers.audit import log_action
