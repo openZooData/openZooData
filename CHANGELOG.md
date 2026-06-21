@@ -26,6 +26,13 @@ All notable changes to OpenZooData will be documented here.
 - CORS (`Access-Control-Allow-Origin: *`) on the public, unauthenticated
   `/feed` and `/feed/<zoo>` endpoints, so third-party tools and browser-based
   feed readers can consume them directly without a server-side proxy
+- `icon_media_id` and `map_overlay_1_id` … `map_overlay_5_id` on `zoo.zoos`
+  (direct foreign-key columns into `zoo.media`, mirroring the existing
+  `species.icon_media_id` convention), resolved on read as
+  `icon_media_path` / `map_overlay_1_path` … `map_overlay_5_path` on both
+  `GET /api/v1/zoos/<zoo>` and `GET /api/v1/admin/zoos/<zoo>`. The existing
+  `icon_url`/`map_overlay` single-value fields are unchanged and remain
+  part of the response alongside the new fields
 
 ### Fixed
 - Tenant isolation gap in enclosure deletion: a fallback code path could
