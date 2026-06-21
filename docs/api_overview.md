@@ -84,6 +84,7 @@ Foto (`media`).
 |Method|Endpoint                                  |Auth     |Beschreibung                                      |
 |------|-------------------------------------------|---------|---------------------------------------------------|
 |GET   |`/api/v1/zoos/<zoo>/enclosure_species`     |JWT read |Alle Tier-Zuordnungen inkl. `feeding_times`, `births`|
+|GET   |`/api/v1/zoos/<zoo>/enclosure_species/<id>`|JWT read |Einzelne Zuordnung (z.B. Refresh nach POST/PUT)   |
 |POST  |`/api/v1/zoos/<zoo>/enclosure_species`     |JWT write|Zuordnung anlegen                                 |
 |PUT   |`/api/v1/zoos/<zoo>/enclosure_species/<id>`|JWT write|Zuordnung bearbeiten                              |
 |DELETE|`/api/v1/zoos/<zoo>/enclosure_species/<id>`|JWT write|Zuordnung löschen (inkl. `media`/`geo_points`)    |
@@ -94,12 +95,15 @@ Foto (`media`).
 - `?house_id=<id>` — Filter nach Tierhaus
 - `?domain_id=<id>` — Filter nach Domain (Enclosure, House oder enclosure_species selbst)
 
-**Kein eigener Endpoint für `feeding_times`/`births`:** beide werden
-ausschließlich über `enclosure_species` verwaltet. `enclosure_species_id`
-(und bei `births` zusätzlich `species_id`/`zoo_id`) kommen immer aus dem
-URL-/Parent-Kontext — der Client schickt sie nie mit.
+**Zwei Wege für `feeding_times`/`births`:** entweder verschachtelt über
+`enclosure_species` (POST/PUT, delete-all-reinsert-Semantik, siehe unten),
+oder über die eigenständigen Sub-Resource-Endpoints weiter unten — beide
+Wege funktionieren parallel und schreiben in dieselben Tabellen.
+`enclosure_species_id` (und bei `births` zusätzlich `species_id`/`zoo_id`)
+kommen in beiden Fällen immer aus dem URL-/Parent-Kontext — der Client
+schickt sie nie mit.
 
-POST/PUT-Body (Auszug):
+POST/PUT-Body (Auszug, verschachtelter Weg):
 
 ```json
 {
@@ -117,7 +121,7 @@ POST/PUT-Body (Auszug):
 - PUT ersetzt eine mitgeschickte Liste komplett (delete-all-reinsert); `[]` löscht alle Einträge, ein fehlendes Feld lässt bestehende Einträge unverändert
 - `species_id` ist über PUT nicht änderbar (400 bei Versuch)
 
-**DELETE-Verhalten:**
+**DELETE-Verhalten (beim Löschen der enclosure_species selbst):**
 
 |Tabelle      |Verhalten                                              |
 |-------------|--------------------------------------------------------|
@@ -125,6 +129,54 @@ POST/PUT-Body (Auszug):
 |births       |bleibt erhalten, `enclosure_species_id` wird `NULL` (historisches Faktum)|
 |geo_points   |wird explizit gelöscht (polymorph, keine FK möglich)     |
 |media        |wird explizit gelöscht inkl. physischer Datei (polymorph, keine FK möglich)|
+
+-----
+
+### Feeding Times (eigenständige CRUD-Endpoints) ✨ neu
+
+|Method|Endpoint                                                       |Auth     |Beschreibung   |
+|------|----------------------------------------------------------------|---------|---------------|
+|GET   |`/api/v1/zoos/<zoo>/feeding_times`                               |JWT read |Alle im Zoo, optional `?species_id=<id>`|
+|GET   |`/api/v1/zoos/<zoo>/enclosure_species/<es_id>/feeding_times`     |JWT read |Liste          |
+|GET   |`/api/v1/zoos/<zoo>/enclosure_species/<es_id>/feeding_times/<id>`|JWT read |Einzeln        |
+|POST  |`/api/v1/zoos/<zoo>/enclosure_species/<es_id>/feeding_times`     |JWT write|Anlegen        |
+|PUT   |`/api/v1/zoos/<zoo>/enclosure_species/<es_id>/feeding_times/<id>`|JWT write|Bearbeiten     |
+|DELETE|`/api/v1/zoos/<zoo>/enclosure_species/<es_id>/feeding_times/<id>`|JWT write|Löschen        |
+
+POST/PUT-Body: `feeding_time` (Pflicht bei POST, `"HH:MM"`), `day_of_week`
+(optional, 0=Mo…6=So, leer = täglich), `note` (optional), `is_public`
+(optional, Default `true`). PUT akzeptiert nur diese vier Felder — Versuch,
+`enclosure_species_id` o.ä. zu ändern, gibt `400`.
+
+-----
+
+### Births (eigenständige CRUD-Endpoints) ✨ neu
+
+|Method|Endpoint                                                 |Auth     |Beschreibung   |
+|------|-----------------------------------------------------------|---------|---------------|
+|GET   |`/api/v1/zoos/<zoo>/births`                               |JWT read |Alle im Zoo, optional `?species_id=<id>`|
+|GET   |`/api/v1/zoos/<zoo>/enclosure_species/<es_id>/births`     |JWT read |Liste          |
+|GET   |`/api/v1/zoos/<zoo>/enclosure_species/<es_id>/births/<id>`|JWT read |Einzeln        |
+|POST  |`/api/v1/zoos/<zoo>/enclosure_species/<es_id>/births`     |JWT write|Anlegen        |
+|PUT   |`/api/v1/zoos/<zoo>/enclosure_species/<es_id>/births/<id>`|JWT write|Bearbeiten     |
+|DELETE|`/api/v1/zoos/<zoo>/enclosure_species/<es_id>/births/<id>`|JWT write|Löschen        |
+
+POST/PUT-Body: `birth_date` (Pflicht bei POST, `"YYYY-MM-DD"`), `count`
+(optional, Default `1`), `note` (optional), `is_public` (optional, Default
+`true`). `species_id`/`zoo_id` werden serverseitig aus der
+`enclosure_species` übernommen — auch wenn der Client sie mitschickt,
+werden sie ignoriert. PUT akzeptiert nur `birth_date`/`count`/`note`/
+`is_public` — `400` bei anderen Feldern.
+
+> Anders als beim kaskadierenden Löschen über die enclosure_species selbst
+> (dort: `enclosure_species_id` → `NULL`, historisches Faktum bleibt
+> erhalten) löscht `DELETE .../births/<id>` die Zeile tatsächlich — gedacht
+> für die direkte Korrektur einer einzelnen Fehleingabe.
+
+`GET /api/v1/zoos/<zoo>/births` nutzt die eigene `zoo_id`-Spalte von
+`births` direkt (kein Join über `enclosure_species` nötig) — births deren
+`enclosure_species` inzwischen gelöscht wurde (`enclosure_species_id` ist
+dann `NULL`) tauchen hier weiterhin auf.
 
 -----
 
@@ -342,7 +394,9 @@ Gibt `409` wenn bereits ein Export für diesen Zoo läuft.
 |Zoos          |2        |                               |
 |Enclosures    |4        |                               |
 |Houses        |5        |                               |
-|Enclosure Species|4     |✨ neu                          |
+|Enclosure Species|5     |✨ +1 GET-Single                |
+|Feeding Times |6        |✨ neu                          |
+|Births        |6        |✨ neu                          |
 |Domains       |5        |✨ +4 (POST/PUT/DELETE + GET id)|
 |Locations     |5        |✨ neu                          |
 |Location Types|5        |✨ neu                          |
@@ -357,4 +411,4 @@ Gibt `409` wenn bereits ein Export für diesen Zoo läuft.
 |Admin Users   |4        |                               |
 |Admin Rollen  |6        |                               |
 |Admin System  |7        |                               |
-|**Gesamt**    |**89**   |**+9 gegenüber V1**            |
+|**Gesamt**    |**102**  |**+22 gegenüber V1**            |

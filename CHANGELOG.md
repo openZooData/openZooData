@@ -14,6 +14,15 @@ All notable changes to OpenZooData will be documented here.
   longer be deleted via the API once a birth has been recorded for it (`409`)
 - GPS positions and photos can now be attached directly to an
   `enclosure_species` entry (in addition to enclosures, houses, and species)
+- `GET /api/v1/zoos/<zoo>/enclosure_species/<id>` to fetch a single
+  species-in-enclosure entry directly, without re-fetching the full list
+- Dedicated CRUD endpoints for feeding times and birth records
+  (`/enclosure_species/<id>/feeding_times`, `/enclosure_species/<id>/births`),
+  alongside the existing nested-array approach on `enclosure_species` itself
+  — both remain supported in parallel
+- Zoo-wide listing of all feeding times and birth records
+  (`/zoos/<zoo>/feeding_times`, `/zoos/<zoo>/births`), independent of any
+  single species-in-enclosure entry, with an optional `species_id` filter
 - CORS (`Access-Control-Allow-Origin: *`) on the public, unauthenticated
   `/feed` and `/feed/<zoo>` endpoints, so third-party tools and browser-based
   feed readers can consume them directly without a server-side proxy

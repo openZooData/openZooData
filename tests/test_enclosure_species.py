@@ -4,17 +4,32 @@ enclosure_species
 
 Endpoints:
   GET    /api/v1/zoos/<zoo>/enclosure_species
+  GET    /api/v1/zoos/<zoo>/enclosure_species/<id>
   POST   /api/v1/zoos/<zoo>/enclosure_species
   PUT    /api/v1/zoos/<zoo>/enclosure_species/<id>
   DELETE /api/v1/zoos/<zoo>/enclosure_species/<id>
 
-Fokus dieser Datei: feeding_times und births werden ausschließlich über
-enclosure_species angesprochen (kein eigener Endpoint). Der Client schickt
-für births NIE enclosure_species_id/species_id/zoo_id mit — die kommen aus
-dem Parent-Kontext (POST: frisch erzeugte es_id; PUT: es_id aus der URL).
+  GET    /api/v1/zoos/<zoo>/enclosure_species/<es_id>/feeding_times
+  GET    /api/v1/zoos/<zoo>/enclosure_species/<es_id>/feeding_times/<id>
+  POST   /api/v1/zoos/<zoo>/enclosure_species/<es_id>/feeding_times
+  PUT    /api/v1/zoos/<zoo>/enclosure_species/<es_id>/feeding_times/<id>
+  DELETE /api/v1/zoos/<zoo>/enclosure_species/<es_id>/feeding_times/<id>
+  GET    /api/v1/zoos/<zoo>/feeding_times  (zoo-weit, optional ?species_id=)
 
-Es gibt absichtlich kein GET .../enclosure_species/<id> — daher holt sich
-_find_es() den Eintrag über die Liste.
+  GET    /api/v1/zoos/<zoo>/enclosure_species/<es_id>/births
+  GET    /api/v1/zoos/<zoo>/enclosure_species/<es_id>/births/<id>
+  POST   /api/v1/zoos/<zoo>/enclosure_species/<es_id>/births
+  PUT    /api/v1/zoos/<zoo>/enclosure_species/<es_id>/births/<id>
+  DELETE /api/v1/zoos/<zoo>/enclosure_species/<es_id>/births/<id>
+  GET    /api/v1/zoos/<zoo>/births  (zoo-weit, optional ?species_id=)
+
+feeding_times und births sind sowohl über das verschachtelte Array auf
+enclosure_species (GET/POST/PUT, delete-all-reinsert-Semantik) als auch
+über die eigenständigen Sub-Resource-Endpoints oben erreichbar — beide
+Wege bleiben parallel unterstützt. Der Client schickt für births NIE
+enclosure_species_id/species_id/zoo_id mit — die kommen aus dem
+Parent-Kontext (POST: frisch erzeugte/übergebene es_id; PUT: es_id aus
+der URL).
 
 Rate-Limit-Hinweise:
   - GET: 60/min — kein Problem
@@ -706,3 +721,577 @@ def test_enclosure_species_delete_wrong_zoo_is_rejected(
         f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/{es_id}",
         headers=jwt_headers
     )
+
+
+###############################################################################
+# ── GET /api/v1/zoos/<zoo>/enclosure_species/<id> — Single ─────────────────
+###############################################################################
+
+def test_enclosure_species_single_requires_auth(base_url, test_zoo, created_enclosure_species_id):
+    """GET ohne Auth → 401/403."""
+    resp = requests.get(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/{created_enclosure_species_id}")
+    assert resp.status_code in (401, 403)
+
+
+@pytest.mark.jwt
+def test_enclosure_species_single_returns_full_object(
+        base_url, jwt_headers, test_zoo, created_enclosure_species_id):
+    """GET Single → 200, gleiche feeding_times/births wie in der Liste."""
+    resp = requests.get(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/{created_enclosure_species_id}",
+        headers=jwt_headers)
+    assert resp.status_code == 200, f"GET Single fehlgeschlagen: {resp.text}"
+    data = resp.json()
+    assert data["id"] == created_enclosure_species_id
+    assert sorted(data["feeding_times"]) == ["09:00:00", "13:00:00", "17:30:00"]
+    assert len(data["births"]) == 2
+
+
+@pytest.mark.jwt
+def test_enclosure_species_single_unknown_id_404(base_url, jwt_headers, test_zoo):
+    """GET Single mit nicht existierender ID → 404."""
+    resp = requests.get(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/99999999",
+        headers=jwt_headers)
+    assert resp.status_code == 404
+
+
+@pytest.mark.jwt
+def test_enclosure_species_single_wrong_zoo_404(
+        base_url, jwt_headers, created_enclosure_species_id):
+    """GET Single über falschen Zoo-Slug → 404 (Tenant-Isolation)."""
+    resp = requests.get(
+        f"{base_url}/api/v1/zoos/zoo_does_not_exist/enclosure_species/"
+        f"{created_enclosure_species_id}",
+        headers=jwt_headers)
+    assert resp.status_code in (403, 404)
+
+
+###############################################################################
+# ── feeding_times — eigenständige CRUD-Endpoints ────────────────────────────
+###############################################################################
+
+@pytest.fixture
+def feeding_es_id(base_url, test_zoo, jwt_headers, created_species_id):
+    """
+    Frische, feedingzeiten-freie enclosure_species pro Test (kein births
+    dran, also über DELETE komplett aufräumbar — anders als
+    created_enclosure_species_id).
+    """
+    time.sleep(1)
+    resp = requests.post(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species",
+        headers=jwt_headers,
+        json={"species_id": created_species_id, "note": "Pytest feeding_times"}
+    )
+    assert resp.status_code == 201, f"Anlegen fehlgeschlagen: {resp.text}"
+    es_id = resp.json()["id"]
+
+    yield es_id
+
+    time.sleep(7)
+    requests.delete(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/{es_id}",
+        headers=jwt_headers
+    )
+
+
+def test_feeding_times_list_requires_auth(base_url, test_zoo, feeding_es_id):
+    """GET ohne Auth → 401/403."""
+    resp = requests.get(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/{feeding_es_id}/feeding_times")
+    assert resp.status_code in (401, 403)
+
+
+@pytest.mark.jwt
+def test_feeding_times_list_empty_initially(base_url, jwt_headers, test_zoo, feeding_es_id):
+    """Frisch angelegte enclosure_species hat keine feeding_times."""
+    resp = requests.get(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/{feeding_es_id}/feeding_times",
+        headers=jwt_headers)
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+@pytest.mark.jwt
+@pytest.mark.write
+def test_feeding_times_create_requires_feeding_time(
+        base_url, jwt_headers, test_zoo, feeding_es_id):
+    """POST ohne feeding_time → 400."""
+    time.sleep(1)
+    resp = requests.post(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/{feeding_es_id}/feeding_times",
+        headers=jwt_headers,
+        json={"note": "kein feeding_time"})
+    assert resp.status_code == 400
+
+
+@pytest.mark.jwt
+@pytest.mark.write
+def test_feeding_times_full_crud_cycle(base_url, jwt_headers, test_zoo, feeding_es_id):
+    """POST → GET Single → GET Liste → PUT → DELETE, durchgängig."""
+    time.sleep(1)
+    create_resp = requests.post(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/{feeding_es_id}/feeding_times",
+        headers=jwt_headers,
+        json={"feeding_time": "08:30", "day_of_week": 1, "note": "Montags",
+              "is_public": True})
+    assert create_resp.status_code == 201, f"Create fehlgeschlagen: {create_resp.text}"
+    ft_id = create_resp.json()["id"]
+
+    get_resp = requests.get(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/{feeding_es_id}"
+        f"/feeding_times/{ft_id}",
+        headers=jwt_headers)
+    assert get_resp.status_code == 200
+    assert get_resp.json()["feeding_time"] == "08:30:00"
+    assert get_resp.json()["day_of_week"] == 1
+    assert get_resp.json()["note"] == "Montags"
+
+    list_resp = requests.get(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/{feeding_es_id}/feeding_times",
+        headers=jwt_headers)
+    assert list_resp.status_code == 200
+    assert any(f["id"] == ft_id for f in list_resp.json())
+
+    time.sleep(1)
+    put_resp = requests.put(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/{feeding_es_id}"
+        f"/feeding_times/{ft_id}",
+        headers=jwt_headers,
+        json={"feeding_time": "09:00", "note": "Verschoben"})
+    assert put_resp.status_code == 200, f"Update fehlgeschlagen: {put_resp.text}"
+
+    get_after_put = requests.get(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/{feeding_es_id}"
+        f"/feeding_times/{ft_id}",
+        headers=jwt_headers)
+    assert get_after_put.json()["feeding_time"] == "09:00:00"
+    assert get_after_put.json()["note"] == "Verschoben"
+    # day_of_week wurde im PUT nicht mitgeschickt → bleibt erhalten
+    assert get_after_put.json()["day_of_week"] == 1
+
+    time.sleep(7)
+    delete_resp = requests.delete(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/{feeding_es_id}"
+        f"/feeding_times/{ft_id}",
+        headers=jwt_headers)
+    assert delete_resp.status_code == 200, f"Delete fehlgeschlagen: {delete_resp.text}"
+
+    get_after_delete = requests.get(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/{feeding_es_id}"
+        f"/feeding_times/{ft_id}",
+        headers=jwt_headers)
+    assert get_after_delete.status_code == 404
+
+
+@pytest.mark.jwt
+@pytest.mark.write
+def test_feeding_times_update_unknown_field_400(
+        base_url, jwt_headers, test_zoo, feeding_es_id):
+    """PUT mit unbekanntem Feld → 400."""
+    time.sleep(1)
+    create_resp = requests.post(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/{feeding_es_id}/feeding_times",
+        headers=jwt_headers,
+        json={"feeding_time": "10:00"})
+    ft_id = create_resp.json()["id"]
+
+    time.sleep(1)
+    put_resp = requests.put(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/{feeding_es_id}"
+        f"/feeding_times/{ft_id}",
+        headers=jwt_headers,
+        json={"enclosure_species_id": 999})
+    assert put_resp.status_code == 400
+
+    time.sleep(7)
+    requests.delete(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/{feeding_es_id}"
+        f"/feeding_times/{ft_id}",
+        headers=jwt_headers)
+
+
+@pytest.mark.jwt
+def test_feeding_times_wrong_es_id_404(base_url, jwt_headers, test_zoo, created_species_id):
+    """
+    feeding_time-ID, die zu einer ANDEREN enclosure_species gehört, ist über
+    die "falsche" es_id im Pfad nicht erreichbar (Scoping-Check, kein reines
+    Vertrauen auf die ID im Pfad).
+    """
+    time.sleep(1)
+    es1 = requests.post(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species",
+        headers=jwt_headers,
+        json={"species_id": created_species_id}).json()["id"]
+    time.sleep(1)
+    es2 = requests.post(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species",
+        headers=jwt_headers,
+        json={"species_id": created_species_id}).json()["id"]
+
+    time.sleep(1)
+    ft_id = requests.post(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/{es1}/feeding_times",
+        headers=jwt_headers,
+        json={"feeding_time": "11:00"}).json()["id"]
+
+    cross_resp = requests.get(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/{es2}/feeding_times/{ft_id}",
+        headers=jwt_headers)
+    assert cross_resp.status_code == 404, \
+        "feeding_time einer anderen enclosure_species sollte nicht erreichbar sein"
+
+    time.sleep(7)
+    requests.delete(f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/{es1}",
+                     headers=jwt_headers)
+    time.sleep(7)
+    requests.delete(f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/{es2}",
+                     headers=jwt_headers)
+
+
+###############################################################################
+# ── births — eigenständige CRUD-Endpoints ───────────────────────────────────
+###############################################################################
+# Nutzt created_enclosure_species_id (auf birth_test_species_id) statt einer
+# eigenen Fixture — births bleiben ohnehin als historisches Faktum bestehen
+# (siehe birth_test_species_id-Docstring), zusätzliche über diese Endpoints
+# angelegte births ändern daran nichts.
+
+def test_births_list_requires_auth(base_url, test_zoo, created_enclosure_species_id):
+    """GET ohne Auth → 401/403."""
+    resp = requests.get(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/"
+        f"{created_enclosure_species_id}/births")
+    assert resp.status_code in (401, 403)
+
+
+@pytest.mark.jwt
+def test_births_list_contains_fixture_births(
+        base_url, jwt_headers, test_zoo, created_enclosure_species_id):
+    """Liste enthält die beiden über die Fixture angelegten births."""
+    resp = requests.get(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/"
+        f"{created_enclosure_species_id}/births",
+        headers=jwt_headers)
+    assert resp.status_code == 200
+    assert len(resp.json()) >= 2
+
+
+@pytest.mark.jwt
+@pytest.mark.write
+def test_births_create_requires_birth_date(
+        base_url, jwt_headers, test_zoo, created_enclosure_species_id):
+    """POST ohne birth_date → 400."""
+    time.sleep(1)
+    resp = requests.post(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/"
+        f"{created_enclosure_species_id}/births",
+        headers=jwt_headers,
+        json={"count": 1})
+    assert resp.status_code == 400
+
+
+@pytest.mark.jwt
+@pytest.mark.write
+def test_births_create_ignores_client_supplied_species_and_zoo(
+        base_url, jwt_headers, test_zoo, created_enclosure_species_id, birth_test_species_id):
+    """
+    species_id/zoo_id werden serverseitig aus der enclosure_species
+    abgeleitet — selbst wenn der Client (falsche) Werte mitschickt, werden
+    die ignoriert, nicht übernommen.
+    """
+    time.sleep(1)
+    resp = requests.post(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/"
+        f"{created_enclosure_species_id}/births",
+        headers=jwt_headers,
+        json={"birth_date": "2026-05-01", "count": 1,
+              "species_id": 999999, "zoo_id": 999999})
+    assert resp.status_code == 201, f"Create fehlgeschlagen: {resp.text}"
+    birth_id = resp.json()["id"]
+
+    get_resp = requests.get(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/"
+        f"{created_enclosure_species_id}/births/{birth_id}",
+        headers=jwt_headers)
+    assert get_resp.json()["species_id"] == birth_test_species_id
+    assert get_resp.json()["species_id"] != 999999
+
+    time.sleep(7)
+    requests.delete(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/"
+        f"{created_enclosure_species_id}/births/{birth_id}",
+        headers=jwt_headers)
+
+
+@pytest.mark.jwt
+@pytest.mark.write
+def test_births_full_crud_cycle(
+        base_url, jwt_headers, test_zoo, created_enclosure_species_id):
+    """POST → GET Single → PUT → DELETE, durchgängig."""
+    time.sleep(1)
+    create_resp = requests.post(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/"
+        f"{created_enclosure_species_id}/births",
+        headers=jwt_headers,
+        json={"birth_date": "2026-06-01", "count": 3,
+              "note": "Pytest-CRUD-Geburt", "is_public": True})
+    assert create_resp.status_code == 201, f"Create fehlgeschlagen: {create_resp.text}"
+    birth_id = create_resp.json()["id"]
+
+    get_resp = requests.get(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/"
+        f"{created_enclosure_species_id}/births/{birth_id}",
+        headers=jwt_headers)
+    assert get_resp.status_code == 200
+    assert get_resp.json()["birth_date"] == "2026-06-01"
+    assert get_resp.json()["count"] == 3
+
+    time.sleep(1)
+    put_resp = requests.put(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/"
+        f"{created_enclosure_species_id}/births/{birth_id}",
+        headers=jwt_headers,
+        json={"count": 4, "note": "Korrigiert"})
+    assert put_resp.status_code == 200, f"Update fehlgeschlagen: {put_resp.text}"
+
+    get_after_put = requests.get(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/"
+        f"{created_enclosure_species_id}/births/{birth_id}",
+        headers=jwt_headers)
+    assert get_after_put.json()["count"] == 4
+    assert get_after_put.json()["note"] == "Korrigiert"
+    # birth_date wurde im PUT nicht mitgeschickt → bleibt erhalten
+    assert get_after_put.json()["birth_date"] == "2026-06-01"
+
+    time.sleep(7)
+    delete_resp = requests.delete(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/"
+        f"{created_enclosure_species_id}/births/{birth_id}",
+        headers=jwt_headers)
+    assert delete_resp.status_code == 200, f"Delete fehlgeschlagen: {delete_resp.text}"
+
+    get_after_delete = requests.get(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/"
+        f"{created_enclosure_species_id}/births/{birth_id}",
+        headers=jwt_headers)
+    assert get_after_delete.status_code == 404
+
+
+@pytest.mark.jwt
+@pytest.mark.write
+def test_births_update_unknown_field_400(
+        base_url, jwt_headers, test_zoo, created_enclosure_species_id):
+    """PUT mit unbekanntem Feld (z.B. species_id) → 400, nicht änderbar."""
+    time.sleep(1)
+    create_resp = requests.post(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/"
+        f"{created_enclosure_species_id}/births",
+        headers=jwt_headers,
+        json={"birth_date": "2026-06-10", "count": 1})
+    birth_id = create_resp.json()["id"]
+
+    time.sleep(1)
+    put_resp = requests.put(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/"
+        f"{created_enclosure_species_id}/births/{birth_id}",
+        headers=jwt_headers,
+        json={"species_id": 1})
+    assert put_resp.status_code == 400
+
+    time.sleep(7)
+    requests.delete(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/"
+        f"{created_enclosure_species_id}/births/{birth_id}",
+        headers=jwt_headers)
+
+
+@pytest.mark.jwt
+def test_births_wrong_es_id_404(
+        base_url, jwt_headers, test_zoo, created_enclosure_species_id, created_species_id):
+    """
+    birth-ID, die zu einer ANDEREN enclosure_species gehört, ist über die
+    "falsche" es_id im Pfad nicht erreichbar.
+    """
+    time.sleep(1)
+    other_es = requests.post(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species",
+        headers=jwt_headers,
+        json={"species_id": created_species_id}).json()["id"]
+
+    list_resp = requests.get(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/"
+        f"{created_enclosure_species_id}/births",
+        headers=jwt_headers)
+    birth_id = list_resp.json()[0]["id"]
+
+    cross_resp = requests.get(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/{other_es}/births/{birth_id}",
+        headers=jwt_headers)
+    assert cross_resp.status_code == 404, \
+        "birth einer anderen enclosure_species sollte nicht erreichbar sein"
+
+    time.sleep(7)
+    requests.delete(f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/{other_es}",
+                     headers=jwt_headers)
+
+
+###############################################################################
+# ── Zoo-weite Listen: GET /api/v1/zoos/<zoo>/feeding_times & .../births ────
+###############################################################################
+
+def test_feeding_times_zoo_wide_requires_auth(base_url, test_zoo):
+    """GET ohne Auth → 401/403."""
+    resp = requests.get(f"{base_url}/api/v1/zoos/{test_zoo}/feeding_times")
+    assert resp.status_code in (401, 403)
+
+
+@pytest.mark.jwt
+@pytest.mark.write
+def test_feeding_times_zoo_wide_contains_created_entry(
+        base_url, jwt_headers, test_zoo, feeding_es_id, created_species_id):
+    """
+    Eine über die enclosure_species-Sub-Resource angelegte Fütterungszeit
+    taucht in der zoo-weiten Liste auf, inkl. Species-Kontext.
+    """
+    time.sleep(1)
+    create_resp = requests.post(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/{feeding_es_id}/feeding_times",
+        headers=jwt_headers,
+        json={"feeding_time": "07:15", "note": "Zoo-weiter-Test"})
+    assert create_resp.status_code == 201
+    ft_id = create_resp.json()["id"]
+
+    list_resp = requests.get(
+        f"{base_url}/api/v1/zoos/{test_zoo}/feeding_times",
+        headers=jwt_headers)
+    assert list_resp.status_code == 200
+    matches = [f for f in list_resp.json() if f["id"] == ft_id]
+    assert matches, "Fütterungszeit sollte in der zoo-weiten Liste auftauchen"
+    entry = matches[0]
+    assert entry["enclosure_species_id"] == feeding_es_id
+    assert entry["species_id"] == created_species_id
+    assert entry["german_name"] == "Pytest-Testtier"
+
+    time.sleep(7)
+    requests.delete(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/{feeding_es_id}"
+        f"/feeding_times/{ft_id}",
+        headers=jwt_headers)
+
+
+@pytest.mark.jwt
+@pytest.mark.write
+def test_feeding_times_zoo_wide_species_id_filter(
+        base_url, jwt_headers, test_zoo, feeding_es_id, created_species_id):
+    """?species_id=<id> filtert korrekt."""
+    time.sleep(1)
+    create_resp = requests.post(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/{feeding_es_id}/feeding_times",
+        headers=jwt_headers,
+        json={"feeding_time": "06:45"})
+    ft_id = create_resp.json()["id"]
+
+    match_resp = requests.get(
+        f"{base_url}/api/v1/zoos/{test_zoo}/feeding_times",
+        headers=jwt_headers,
+        params={"species_id": created_species_id})
+    assert match_resp.status_code == 200
+    assert any(f["id"] == ft_id for f in match_resp.json())
+
+    no_match_resp = requests.get(
+        f"{base_url}/api/v1/zoos/{test_zoo}/feeding_times",
+        headers=jwt_headers,
+        params={"species_id": 999999})
+    assert no_match_resp.status_code == 200
+    assert all(f["id"] != ft_id for f in no_match_resp.json())
+
+    time.sleep(7)
+    requests.delete(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/{feeding_es_id}"
+        f"/feeding_times/{ft_id}",
+        headers=jwt_headers)
+
+
+def test_births_zoo_wide_requires_auth(base_url, test_zoo):
+    """GET ohne Auth → 401/403."""
+    resp = requests.get(f"{base_url}/api/v1/zoos/{test_zoo}/births")
+    assert resp.status_code in (401, 403)
+
+
+@pytest.mark.jwt
+def test_births_zoo_wide_contains_fixture_births(
+        base_url, jwt_headers, test_zoo, created_enclosure_species_id, birth_test_species_id):
+    """Die beiden Fixture-births tauchen in der zoo-weiten Liste auf."""
+    resp = requests.get(
+        f"{base_url}/api/v1/zoos/{test_zoo}/births",
+        headers=jwt_headers)
+    assert resp.status_code == 200
+    matches = [b for b in resp.json() if b["enclosure_species_id"] == created_enclosure_species_id]
+    assert len(matches) >= 2
+    assert matches[0]["species_id"] == birth_test_species_id
+    assert matches[0]["german_name"] == "Pytest-Geburtstier"
+
+
+@pytest.mark.jwt
+@pytest.mark.write
+def test_births_zoo_wide_species_id_filter(
+        base_url, jwt_headers, test_zoo, created_enclosure_species_id, birth_test_species_id):
+    """?species_id=<id> filtert korrekt."""
+    match_resp = requests.get(
+        f"{base_url}/api/v1/zoos/{test_zoo}/births",
+        headers=jwt_headers,
+        params={"species_id": birth_test_species_id})
+    assert match_resp.status_code == 200
+    assert len(match_resp.json()) >= 2
+
+    no_match_resp = requests.get(
+        f"{base_url}/api/v1/zoos/{test_zoo}/births",
+        headers=jwt_headers,
+        params={"species_id": 999999})
+    assert no_match_resp.status_code == 200
+    assert no_match_resp.json() == []
+
+
+@pytest.mark.jwt
+@pytest.mark.write
+def test_births_zoo_wide_survives_parent_enclosure_species_deletion(
+        base_url, jwt_headers, test_zoo, created_species_id):
+    """
+    Regressionstest: wird die enclosure_species gelöscht, bleibt die birth
+    als historisches Faktum erhalten (enclosure_species_id → NULL) — und
+    muss in der zoo-weiten Liste weiterhin auftauchen, da births eine
+    eigene zoo_id hat und nicht über enclosure_species gejoint wird.
+    """
+    time.sleep(1)
+    create_es_resp = requests.post(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species",
+        headers=jwt_headers,
+        json={"species_id": created_species_id,
+              "births": [{"birth_date": "2026-05-20", "count": 1,
+                          "note": "Wird gleich verwaist"}]})
+    assert create_es_resp.status_code == 201
+    es_id = create_es_resp.json()["id"]
+
+    list_before = requests.get(
+        f"{base_url}/api/v1/zoos/{test_zoo}/births",
+        headers=jwt_headers)
+    matches_before = [b for b in list_before.json() if b["enclosure_species_id"] == es_id]
+    assert len(matches_before) == 1
+    birth_id = matches_before[0]["id"]
+
+    time.sleep(7)
+    delete_resp = requests.delete(
+        f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species/{es_id}",
+        headers=jwt_headers)
+    assert delete_resp.status_code == 200
+
+    list_after = requests.get(
+        f"{base_url}/api/v1/zoos/{test_zoo}/births",
+        headers=jwt_headers)
+    matches_after = [b for b in list_after.json() if b["id"] == birth_id]
+    assert matches_after, \
+        "birth sollte nach Löschen der enclosure_species weiterhin in der zoo-weiten Liste stehen"
+    assert matches_after[0]["enclosure_species_id"] is None

@@ -130,6 +130,91 @@ def get_enclosures(zoo):
         if pg: pg.close()
 
 
+@enclosure_species_bp.route("/api/v1/zoos/<zoo>/enclosure_species/<int:es_id>", methods=["GET"])
+@limiter.limit("60 per minute")
+def get_enclosure_species_single(zoo, es_id):
+    """
+    Einzelne enclosure_species eines Zoos.
+    Praktisch z.B. für einen Refresh direkt nach einem PUT/POST,
+    ohne die komplette Liste neu laden zu müssen.
+    """
+    if not is_valid_slug(zoo):
+        return jsonify({"error": "Invalid zoo identifier"}), 400
+    user_id, err = require_zoo_access(zoo, "read")
+    if err: return err
+
+    pg = None
+    try:
+        pg = get_pg_connection()
+        with pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT
+                    es.id,
+                    es.species_id,
+                    es.enclosure_id,
+                    es.house_id,
+                    es.note,
+                    es.count_adult,
+                    es.count_juvenile,
+                    es.counted_at,
+                    es.domain_id,
+                    s.german_name,
+                    s.latin_name,
+                    s.wikidata_id,
+                    s.iucn_status_id,
+                    s.iucn_id,
+                    s.gbif_taxon_key,
+                    e.name AS enclosure_name,
+                    e.sort_order AS enclosure_sort_order,
+                    e.domain_id AS enclosure_domain_id,
+                    h.name AS house_name,
+                    h.domain_id AS house_domain_id,
+                    gp.latitude,
+                    gp.longitude,
+                    ms.storage_path || ms.filename AS species_icon_path,
+                    mimg.storage_path || mimg.filename AS image_path,
+                    (
+                        SELECT ARRAY_AGG(ft.feeding_time::TEXT ORDER BY ft.feeding_time)
+                        FROM zoo.feeding_times ft
+                        WHERE ft.enclosure_species_id = es.id
+                    ) AS feeding_times,
+                    (
+                        SELECT JSON_AGG(
+                            json_build_object(
+                                'id', b.id,
+                                'birth_date', b.birth_date::TEXT,
+                                'count', b.count,
+                                'note', b.note,
+                                'is_public', b.is_public
+                            ) ORDER BY b.birth_date DESC
+                        )
+                        FROM zoo.births b
+                        WHERE b.enclosure_species_id = es.id
+                    ) AS births
+                FROM zoo.enclosure_species es
+                JOIN zoo.species s ON s.id = es.species_id
+                LEFT JOIN zoo.enclosures e ON e.id = es.enclosure_id
+                LEFT JOIN zoo.houses h ON h.id = es.house_id
+                LEFT JOIN zoo.geo_points gp
+                       ON gp.entity_type = 'enclosure_species'
+                      AND gp.entity_id = es.id
+                LEFT JOIN zoo.media ms ON ms.id = s.icon_media_id
+                LEFT JOIN zoo.media mimg ON mimg.id = e.image_media_id
+                WHERE es.id = %s
+                  AND es.zoo_id = (SELECT id FROM zoo.zoos WHERE slug = %s)
+            """, (es_id, zoo))
+            row = cur.fetchone()
+        if not row:
+            return jsonify({"error": "Not found"}), 404
+        return jsonify(dict(row)), 200
+    except Exception:
+        logging.exception(f"Exception in GET /api/v1/zoos/{zoo}/enclosure_species/{es_id}")
+        return jsonify({"error": "Internal server error"}), 500
+    finally:
+        if pg: pg.close()
+
+
+
 @enclosure_species_bp.route("/api/v1/zoos/<zoo>/enclosure_species", methods=["POST"])
 @limiter.limit("30 per minute")
 def create_enclosure(zoo):
