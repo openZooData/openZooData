@@ -96,6 +96,7 @@ COMMIT;
 | `/db/<zoo>` | SQLite export download |
 | `/api/v1/species` | Species data |
 | `/api/v1/zoos/<zoo>/enclosures` | Enclosure data |
+| `/api/v1/zoos/<zoo>/enclosure_species` | Species-in-enclosure links (feeding times, births, GPS, photos) |
 | `/api/v1/admin/zoos` | Admin: zoo management |
 | `/api/v1/admin/users` | Admin: user management |
 | `/status` | Health check |
@@ -122,8 +123,10 @@ openZooData/
 │   ├── pytest.ini
 │   ├── requirements-dev.txt
 │   ├── test_api.py
+│   ├── test_enclosure_species.py
 │   ├── test_feed.py
 │   ├── test_feedback_api.py
+│   ├── test_rbac.py
 │   ├── test_security.py
 │   └── test_z_cleanup.py
 ├── docs/

@@ -10,6 +10,7 @@ Lokal: `http://localhost:5001`
 - `JWT` = Bearer JWT (Zoo-Admin oder super_admin)
 - `JWT read` = JWT mit read-Berechtigung auf diesen Zoo
 - `JWT write` = JWT mit write-Berechtigung auf diesen Zoo
+- `JWT write (global)` = JWT mit write-Berechtigung (zoo_admin/editor) auf irgendeinem Zoo, oder tenant_admin/super_admin — für Endpoints ohne Zoo-Kontext
 - `JWT publish` = JWT mit publish-Berechtigung auf diesen Zoo
 - `JWT super_admin` = JWT mit globaler super_admin-Rolle
 
@@ -176,8 +177,8 @@ Lesen: alle JWT-User. Schreiben: nur super_admin.
 |Method|Endpoint                    |Auth     |Beschreibung                        |
 |------|----------------------------|---------|------------------------------------|
 |GET   |`/api/v1/species?search=<q>`|JWT      |Globale Suche (deutsch + lateinisch)|
-|POST  |`/api/v1/species`           |JWT write|Tierart anlegen                     |
-|DELETE|`/api/v1/species/<id>`      |JWT write|Tierart löschen                     |
+|POST  |`/api/v1/species`           |JWT write (global)|Tierart anlegen                     |
+|DELETE|`/api/v1/species/<id>`      |JWT super_admin|Tierart löschen (`409` falls noch `enclosure_species`/`births` verknüpft)|
 |GET   |`/api/v1/zoos/<zoo>/species`|JWT read |Artenliste pro Zoo                  |
 
 **Query-Parameter für `/api/v1/zoos/<zoo>/species`:**
@@ -199,6 +200,9 @@ Lesen: alle JWT-User. Schreiben: nur super_admin.
 **Erlaubte `entity_type`-Werte:**
 `zoo`, `species`, `enclosure`, `enclosure_species`, `house`, `location`, `domain`
 
+> `species` ist zoo-übergreifend (global) — der gespeicherte Pfad hat hier
+> kein `<zoo>`-Segment, sondern die Form `species/<filename>`.
+
 **Erlaubte Formate:** JPEG, PNG, WebP · **Max. Größe:** 10 MB · SVG verboten  
 **Dateiendung** wird strikt an MIME-Typ gebunden (Fix Juni 2026).
 
@@ -217,18 +221,18 @@ Lesen: alle JWT-User. Schreiben: nur super_admin.
 
 **Feedback-Typen:**
 
-|ID|Slug                  |Pflichtfelder                                      |
-|--|----------------------|---------------------------------------------------|
-|1 |`feeding_time`        |`enclosure_id`, `value_time`                       |
-|2 |`position`            |`enclosure_id`, `value_latitude`, `value_longitude`|
-|3 |`new_species_wikidata`|`enclosure_id`, `value_wikidata_id`                |
-|4 |`species_missing`     |`enclosure_id`                                     |
-|5 |`enclosure_name`      |`enclosure_id`                                     |
-|6 |`zoo_info`            |—                                                  |
-|7 |`opening_hours`       |—                                                  |
-|8 |`report`              |`enclosure_id`, `value_report_reason_id`           |
-|9 |`text_helpful`        |`value_enrichment_text_id`                         |
-|10|`text_not_helpful`    |`value_enrichment_text_id`                         |
+|ID|Slug                  |Pflichtfelder                                                |
+|--|----------------------|--------------------------------------------------------------|
+|1 |`feeding_time`        |`enclosure_species_id`, `value_time`                         |
+|2 |`position`            |`enclosure_species_id`, `value_latitude`, `value_longitude`  |
+|3 |`new_species_wikidata`|`enclosure_species_id`, `value_wikidata_id`                  |
+|4 |`new_species_existing`|`enclosure_species_id`, `value_species_id`                   |
+|5 |`species_birthday`    |`enclosure_species_id`, `value_species_id`, `value_date`     |
+|6 |`count_adult`         |`enclosure_species_id`, `value_species_id`, `value_count`    |
+|7 |`count_juvenile`      |`enclosure_species_id`, `value_species_id`, `value_count`    |
+|8 |`text_incorrect`      |`value_enrichment_text_id`                                   |
+|9 |`text_helpful`        |`value_enrichment_text_id`                                   |
+|10|`text_excellent`      |`value_enrichment_text_id`                                   |
 
 Rate-Limit: 2/min, 60/Tag pro Gerät.
 

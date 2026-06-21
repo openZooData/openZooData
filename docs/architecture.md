@@ -54,8 +54,10 @@ Main structured zoo data:
 - zoos
 - species
 - enclosures
+- enclosure_species (links a species to an enclosure and/or house)
 - geo_points
 - feeding_times
+- births
 - translations
 - domains
 

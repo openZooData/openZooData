@@ -8,6 +8,7 @@
 - App-token authentication
 - Species APIs
 - Enclosure APIs
+- Enclosure Species (feeding times, birth records, GPS positions, photos)
 - SQLite export delivery
 - Public RSS feeds
 - Wikidata tooling
