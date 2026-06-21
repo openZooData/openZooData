@@ -1258,18 +1258,24 @@ def test_births_zoo_wide_species_id_filter(
 @pytest.mark.jwt
 @pytest.mark.write
 def test_births_zoo_wide_survives_parent_enclosure_species_deletion(
-        base_url, jwt_headers, test_zoo, created_species_id):
+        base_url, jwt_headers, test_zoo, birth_test_species_id):
     """
     Regressionstest: wird die enclosure_species gelöscht, bleibt die birth
     als historisches Faktum erhalten (enclosure_species_id → NULL) — und
     muss in der zoo-weiten Liste weiterhin auftauchen, da births eine
     eigene zoo_id hat und nicht über enclosure_species gejoint wird.
+
+    Nutzt bewusst birth_test_species_id statt created_species_id: die hier
+    erzeugte birth bleibt dauerhaft (auch nach Löschen ihrer
+    enclosure_species) über species_id mit der Species verknüpft — das
+    würde die spätere Cleanup-Löschung von created_species_id mit 409
+    blockieren (genau wie bei birth_test_species_id selbst beabsichtigt).
     """
     time.sleep(1)
     create_es_resp = requests.post(
         f"{base_url}/api/v1/zoos/{test_zoo}/enclosure_species",
         headers=jwt_headers,
-        json={"species_id": created_species_id,
+        json={"species_id": birth_test_species_id,
               "births": [{"birth_date": "2026-05-20", "count": 1,
                           "note": "Wird gleich verwaist"}]})
     assert create_es_resp.status_code == 201
