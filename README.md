@@ -130,6 +130,8 @@ openZooData/
 │   ├── test_security.py
 │   └── test_z_cleanup.py
 ├── docs/
+├── html/                     ← Eigenständige Hilfswerkzeuge (kein Server-Code)
+│   └── zoo-qr-codes.html     ← Zeigt QR-Codes aller über /feed publizierten Zoos
 ├── .gitignore
 └── README.md
 ```
