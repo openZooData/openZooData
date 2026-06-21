@@ -87,11 +87,11 @@ def main():
 
     # SQL für fehlende DB-Einträge generieren
     if found:
-        print("\n-- SQL zum Eintragen der vorhandenen Bilder:")
-        print("-- Ausführen in Postico auf der Zoo-DB\n")
+        print(f"\n-- SQL zum Eintragen der vorhandenen Bilder:")
+        print(f"-- Ausführen in Postico auf der Zoo-DB\n")
         for s, filename in found:
             print(f"""INSERT INTO zoo.media (entity_type, entity_id, filename, storage_path, mime_type, label, zoo_id)
-VALUES ('species', {s['id']}, '{filename}', 'media/species/', 'image/png', 'icon', NULL)
+VALUES ('species', {s['id']}, '{filename}', 'species/', 'image/png', 'icon', NULL)
 ON CONFLICT DO NOTHING;""")
 
 if __name__ == "__main__":

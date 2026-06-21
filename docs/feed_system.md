@@ -29,6 +29,9 @@ Current implementation:
 - SQLite export references
 - changelog support
 - data versioning
+- CORS-enabled (both endpoints are public and unauthenticated, and can be
+  fetched directly from a browser context — e.g. third-party feed readers
+  or dashboards)
 
 ## Long-Term Vision
 
