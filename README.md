@@ -7,7 +7,9 @@
 
 ![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)  ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-required-blue.svg)
 
-![Status](https://img.shields.io/badge/Status-Alpha-orange.svg)
+![Status](https://img.shields.io/badge/Status-Alpha-orange.svg)  ![Tests](https://github.com/openZooData/openZooData/actions/workflows/test.yml/badge.svg)
+
+
 
 Open infrastructure for zoo, animal, enclosure and visitor data.
 
