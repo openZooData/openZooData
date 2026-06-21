@@ -2,13 +2,13 @@ import logging
 import psycopg2
 import psycopg2.extras
 from flask import Blueprint, jsonify, request
-from db import get_pg_connection
+from db import get_pg_connection, get_auth_connection
 from extensions import limiter
 from helpers.authz import require_super_admin
 from helpers.audit import log_action
 from helpers.coordinates import is_valid_slug
-from routes.admin_routes.helpers import (_require_can_manage_zoo,
-    _get_zoo_id_by_slug, _validate_zoo_fields)
+from routes.admin_routes.helpers import (_can_manage_zoo, _require_can_manage_zoo,
+    _get_zoo_id_by_slug, _validate_zoo_fields, _is_super_admin)
 
 admin_zoos_bp = Blueprint("admin_zoos_bp", __name__)
 
@@ -175,7 +175,7 @@ def get_zoo_details(zoo):
                        latitude, longitude,
                        top_left_latitude, top_left_longitude,
                        bottom_right_latitude, bottom_right_longitude,
-                       map_overlay, time_open, time_close,
+                       map_overlay, time_open::TEXT, time_close::TEXT,
                        data_version, is_active, archived_at
                 FROM zoo.zoos WHERE slug = %s
             """, (zoo,))
