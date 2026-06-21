@@ -85,7 +85,8 @@ def get_location(zoo, location_id):
 
             # Öffnungszeiten
             cur.execute("""
-                SELECT day_of_week, open_time, close_time, valid_from, valid_until, label
+                SELECT day_of_week, open_time::TEXT, close_time::TEXT,
+                       valid_from, valid_until, label
                 FROM zoo.opening_hours
                 WHERE location_id = %s
                 ORDER BY day_of_week

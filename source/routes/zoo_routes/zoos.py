@@ -1,6 +1,6 @@
 import logging
 import psycopg2.extras
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 from db import get_pg_connection
 from extensions import limiter
 from helpers.coordinates import is_valid_slug
@@ -69,7 +69,7 @@ def get_zoo(zoo):
                        z.bottom_right_latitude, z.bottom_right_longitude,
                        z.map_overlay, z.data_version,
                        z.easy_language, z.number_animals, z.icon_url,
-                       z.time_open, z.time_close
+                       z.time_open::TEXT, z.time_close::TEXT
                 FROM zoo.zoos z
                 WHERE z.slug = %s
                   AND z.is_active = TRUE
@@ -82,7 +82,8 @@ def get_zoo(zoo):
 
             # Öffnungszeiten (falls vorhanden)
             cur.execute("""
-                SELECT day_of_week, open_time, close_time, valid_from, valid_until, label
+                SELECT day_of_week, open_time::TEXT, close_time::TEXT,
+                       valid_from, valid_until, label
                 FROM zoo.zoo_opening_hours
                 WHERE zoo_id = %s
                 ORDER BY day_of_week
