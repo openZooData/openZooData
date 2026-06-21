@@ -99,6 +99,58 @@ def test_zoo_details_structure(base_url, jwt_headers, test_zoo):
 
 
 @pytest.mark.jwt
+def test_zoo_details_media_fields_present(base_url, jwt_headers, test_zoo):
+    """
+    GET /api/v1/zoos/<zoo> → icon_media_path und map_overlay_1_path..5_path
+    sind immer im Response (über icon_media_id/map_overlay_<n>_id-Spalten
+    aufgelöst), auch wenn noch kein media-Eintrag verknüpft ist (dann null).
+    icon_url/map_overlay (Legacy-Felder) bleiben unverändert zusätzlich da.
+
+    test_zoo (Default zoo_berlin) hat icon_media_id und map_overlay_1_id
+    bereits verknüpft (siehe insert_zoo_icon_media.sql /
+    insert_zoo_mapoverlay1_media.sql) — dort wird der tatsächlich aufgelöste
+    Pfad geprüft, nicht nur die reine Feldpräsenz. map_overlay_2..5 sind
+    aktuell noch nicht befüllt ("mehr haben wir zur Zeit nicht").
+    """
+    resp = requests.get(f"{base_url}/api/v1/zoos/{test_zoo}",
+                        headers=jwt_headers)
+    assert resp.status_code == 200
+    z = resp.json()
+    for field in ("icon_media_path", "map_overlay_1_path", "map_overlay_2_path",
+                  "map_overlay_3_path", "map_overlay_4_path", "map_overlay_5_path",
+                  "icon_url", "map_overlay"):
+        assert field in z, f"Feld '{field}' fehlt in der Antwort"
+
+    if test_zoo == "zoo_berlin":
+        assert z["icon_media_path"] == "zoo/zoo_berlin/icon/icon_berlin.png"
+        assert z["map_overlay_1_path"] == "zoo/zoo_berlin/map/MapOverlay1_Berlin.png"
+        assert z["map_overlay_2_path"] is None
+        assert z["map_overlay_3_path"] is None
+        assert z["map_overlay_4_path"] is None
+        assert z["map_overlay_5_path"] is None
+
+
+@pytest.mark.jwt
+def test_admin_zoo_details_media_fields_present(base_url, jwt_headers, test_zoo):
+    """
+    GET /api/v1/admin/zoos/<zoo> → dieselben Media-Felder wie beim
+    app-seitigen Endpoint, gleiche icon_media_id/map_overlay_<n>_id-Joins.
+    """
+    resp = requests.get(f"{base_url}/api/v1/admin/zoos/{test_zoo}",
+                        headers=jwt_headers)
+    assert resp.status_code == 200, f"Admin Zoo-Details: {resp.text}"
+    z = resp.json()
+    for field in ("icon_media_path", "map_overlay_1_path", "map_overlay_2_path",
+                  "map_overlay_3_path", "map_overlay_4_path", "map_overlay_5_path",
+                  "icon_url", "map_overlay"):
+        assert field in z, f"Feld '{field}' fehlt in der Antwort"
+
+    if test_zoo == "zoo_berlin":
+        assert z["icon_media_path"] == "zoo/zoo_berlin/icon/icon_berlin.png"
+        assert z["map_overlay_1_path"] == "zoo/zoo_berlin/map/MapOverlay1_Berlin.png"
+
+
+@pytest.mark.jwt
 def test_zoo_details_invalid_slug(base_url, jwt_headers):
     """GET /api/v1/zoos/<ungültiger slug> → 400."""
     resp = requests.get(f"{base_url}/api/v1/zoos/../../etc/passwd",

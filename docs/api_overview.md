@@ -49,6 +49,31 @@ Lokal: `http://localhost:5001`
 |GET   |`/api/v1/zoos`      |JWT     |Alle aktiven Zoos           |
 |GET   |`/api/v1/zoos/<zoo>`|JWT read|Zoo-Details + Öffnungszeiten|
 
+**Medien-Felder in der Zoo-Detail-Antwort** ✨ neu: `icon_media_id` und
+`map_overlay_1_id` … `map_overlay_5_id` sind direkte FK-Spalten auf
+`zoo.zoos` (analog zu `species.icon_media_id`), jeweils aufgelöst zu
+`icon_media_path` / `map_overlay_1_path` … `map_overlay_5_path` (Pfad aus
+`storage_path || filename`, `null` falls noch nicht verknüpft). Die alten
+Einzelwert-Felder `icon_url` (für den RSS-Feed) und `map_overlay` bleiben
+unverändert zusätzlich Teil der Antwort — es findet kein Merge statt, der
+Client entscheidet selbst, welche Quelle er verwendet.
+
+Verknüpfen läuft aktuell ausschließlich manuell per SQL (kein API-Endpoint
+dafür, genau wie bei `species.icon_media_id`):
+
+```sql
+-- 1) Datei hochladen, label frei wählbar (z.B. 'icon', 'map_overlay_1')
+--    POST /api/v1/media/zoo/<zoo_id>  (multipart, Felder: file, label)
+
+-- 2) Verknüpfen
+UPDATE zoo.zoos SET icon_media_id = <media.id> WHERE slug = '<zoo>';
+UPDATE zoo.zoos SET map_overlay_1_id = <media.id> WHERE slug = '<zoo>';
+```
+
+`map_overlay_2_id` … `map_overlay_5_id` sind feste, zusätzliche Slots für
+künftige Varianten — nicht erweiterbar ohne weitere Migration, anders als
+das frühere label-basierte Konzept.
+
 -----
 
 ## Enclosures (Tiergehege)
@@ -323,6 +348,11 @@ Gibt `409` wenn bereits ein Export für diesen Zoo läuft.
 |------|--------------------------|------------------------------|----------------|
 |GET   |`/api/v1/admin/zoos`      |JWT super_admin               |Zoo-Liste       |
 |GET   |`/api/v1/admin/zoos/<zoo>`|JWT super_admin / tenant_admin|Zoo-Details     |
+
+`GET /api/v1/admin/zoos/<zoo>` liefert dieselben Medien-Felder
+(`icon_media_path`, `map_overlay_1_path` … `map_overlay_5_path`,
+`icon_url`, `map_overlay`) wie der app-seitige Endpoint — siehe
+[Zoos](#zoos) oben.
 |POST  |`/api/v1/admin/zoos`      |JWT super_admin               |Zoo anlegen     |
 |PUT   |`/api/v1/admin/zoos/<zoo>`|JWT super_admin / tenant_admin|Zoo bearbeiten  |
 |DELETE|`/api/v1/admin/zoos/<zoo>`|JWT super_admin               |Zoo deaktivieren|

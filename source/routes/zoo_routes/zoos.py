@@ -69,8 +69,20 @@ def get_zoo(zoo):
                        z.bottom_right_latitude, z.bottom_right_longitude,
                        z.map_overlay, z.data_version,
                        z.easy_language, z.number_animals, z.icon_url,
-                       z.time_open::TEXT, z.time_close::TEXT
+                       z.time_open::TEXT, z.time_close::TEXT,
+                       im.storage_path || im.filename AS icon_media_path,
+                       mo1.storage_path || mo1.filename AS map_overlay_1_path,
+                       mo2.storage_path || mo2.filename AS map_overlay_2_path,
+                       mo3.storage_path || mo3.filename AS map_overlay_3_path,
+                       mo4.storage_path || mo4.filename AS map_overlay_4_path,
+                       mo5.storage_path || mo5.filename AS map_overlay_5_path
                 FROM zoo.zoos z
+                LEFT JOIN zoo.media im  ON im.id  = z.icon_media_id
+                LEFT JOIN zoo.media mo1 ON mo1.id = z.map_overlay_1_id
+                LEFT JOIN zoo.media mo2 ON mo2.id = z.map_overlay_2_id
+                LEFT JOIN zoo.media mo3 ON mo3.id = z.map_overlay_3_id
+                LEFT JOIN zoo.media mo4 ON mo4.id = z.map_overlay_4_id
+                LEFT JOIN zoo.media mo5 ON mo5.id = z.map_overlay_5_id
                 WHERE z.slug = %s
                   AND z.is_active = TRUE
                   AND z.archived_at IS NULL

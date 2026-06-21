@@ -171,18 +171,33 @@ def get_zoo_details(zoo):
         conn = get_pg_connection()
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
-                SELECT id, slug, name, url, description, email,
-                       latitude, longitude,
-                       top_left_latitude, top_left_longitude,
-                       bottom_right_latitude, bottom_right_longitude,
-                       map_overlay, time_open::TEXT, time_close::TEXT,
-                       data_version, is_active, archived_at
-                FROM zoo.zoos WHERE slug = %s
+                SELECT z.id, z.slug, z.name, z.url, z.description, z.email,
+                       z.latitude, z.longitude,
+                       z.top_left_latitude, z.top_left_longitude,
+                       z.bottom_right_latitude, z.bottom_right_longitude,
+                       z.map_overlay, z.icon_url, z.time_open::TEXT, z.time_close::TEXT,
+                       z.data_version, z.is_active, z.archived_at,
+                       im.storage_path || im.filename AS icon_media_path,
+                       mo1.storage_path || mo1.filename AS map_overlay_1_path,
+                       mo2.storage_path || mo2.filename AS map_overlay_2_path,
+                       mo3.storage_path || mo3.filename AS map_overlay_3_path,
+                       mo4.storage_path || mo4.filename AS map_overlay_4_path,
+                       mo5.storage_path || mo5.filename AS map_overlay_5_path
+                FROM zoo.zoos z
+                LEFT JOIN zoo.media im  ON im.id  = z.icon_media_id
+                LEFT JOIN zoo.media mo1 ON mo1.id = z.map_overlay_1_id
+                LEFT JOIN zoo.media mo2 ON mo2.id = z.map_overlay_2_id
+                LEFT JOIN zoo.media mo3 ON mo3.id = z.map_overlay_3_id
+                LEFT JOIN zoo.media mo4 ON mo4.id = z.map_overlay_4_id
+                LEFT JOIN zoo.media mo5 ON mo5.id = z.map_overlay_5_id
+                WHERE z.slug = %s
             """, (zoo,))
             row = cur.fetchone()
             if not row:
                 return jsonify({"error": "Zoo not found"}), 404
-        return jsonify(dict(row)), 200
+            zoo_data = dict(row)
+
+        return jsonify(zoo_data), 200
 
     except Exception:
         logging.exception(f"Exception in GET /admin/zoos/{zoo}")
