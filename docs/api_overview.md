@@ -49,30 +49,26 @@ Lokal: `http://localhost:5001`
 |GET   |`/api/v1/zoos`      |JWT     |Alle aktiven Zoos           |
 |GET   |`/api/v1/zoos/<zoo>`|JWT read|Zoo-Details + Öffnungszeiten|
 
-**Medien-Felder in der Zoo-Detail-Antwort** ✨ neu: `icon_media_id` und
+**Medien-Felder in der Zoo-Detail-Antwort:** `icon_media_id` und
 `map_overlay_1_id` … `map_overlay_5_id` sind direkte FK-Spalten auf
-`zoo.zoos` (analog zu `species.icon_media_id`), jeweils aufgelöst zu
-`icon_media_path` / `map_overlay_1_path` … `map_overlay_5_path` (Pfad aus
-`storage_path || filename`, `null` falls noch nicht verknüpft). Die alten
-Einzelwert-Felder `icon_url` (für den RSS-Feed) und `map_overlay` bleiben
-unverändert zusätzlich Teil der Antwort — es findet kein Merge statt, der
-Client entscheidet selbst, welche Quelle er verwendet.
+`zoo.zoos`, jeweils aufgelöst zu `icon_media_path` / `map_overlay_1_path`
+… `map_overlay_5_path` (Pfad aus `storage_path || filename`, `null` falls
+noch nicht verknüpft). Die alten Einzelwert-Felder `icon_url` (für den
+RSS-Feed) und `map_overlay` bleiben unverändert zusätzlich Teil der Antwort
+— kein Merge, der Client entscheidet selbst welche Quelle er verwendet.
 
-Verknüpfen läuft aktuell ausschließlich manuell per SQL (kein API-Endpoint
-dafür, genau wie bei `species.icon_media_id`):
+`time_open` / `time_close` sind einfache Zeitfelder direkt auf `zoo.zoos`
+(eine einzige, globale Öffnungszeit ohne Wochentag-Differenzierung),
+editierbar über `PUT /api/v1/admin/zoos/<zoo>`. Daneben gibt es die
+detaillierten wochentag-basierten Öffnungszeiten über `zoo.zoo_opening_hours`
+— siehe Abschnitt [Öffnungszeiten](#öffnungszeiten).
+
+Verknüpfen ausschließlich manuell per SQL (kein API-Endpoint):
 
 ```sql
--- 1) Datei hochladen, label frei wählbar (z.B. 'icon', 'map_overlay_1')
---    POST /api/v1/media/zoo/<zoo_id>  (multipart, Felder: file, label)
-
--- 2) Verknüpfen
-UPDATE zoo.zoos SET icon_media_id = <media.id> WHERE slug = '<zoo>';
+UPDATE zoo.zoos SET icon_media_id   = <media.id> WHERE slug = '<zoo>';
 UPDATE zoo.zoos SET map_overlay_1_id = <media.id> WHERE slug = '<zoo>';
 ```
-
-`map_overlay_2_id` … `map_overlay_5_id` sind feste, zusätzliche Slots für
-künftige Varianten — nicht erweiterbar ohne weitere Migration, anders als
-das frühere label-basierte Konzept.
 
 -----
 
@@ -99,189 +95,253 @@ das frühere label-basierte Konzept.
 
 -----
 
-## Enclosure Species (Tier-Zuordnungen) ✨ neu
+## Enclosure Species (Tier-Zuordnungen)
 
 Verknüpft eine Tierart (Species) mit einem Ort im Zoo — optional einem
 Enclosure (Freigehege) und/oder einem House (Tierhaus). Zentraler
 Knotenpunkt für Fütterungszeiten, Geburten, GPS-Position (`geo_points`) und
 Foto (`media`).
 
-|Method|Endpoint                                  |Auth     |Beschreibung                                      |
-|------|-------------------------------------------|---------|---------------------------------------------------|
+|Method|Endpoint                                   |Auth     |Beschreibung                                        |
+|------|-------------------------------------------|---------|----------------------------------------------------|
 |GET   |`/api/v1/zoos/<zoo>/enclosure_species`     |JWT read |Alle Tier-Zuordnungen inkl. `feeding_times`, `births`|
-|GET   |`/api/v1/zoos/<zoo>/enclosure_species/<id>`|JWT read |Einzelne Zuordnung (z.B. Refresh nach POST/PUT)   |
-|POST  |`/api/v1/zoos/<zoo>/enclosure_species`     |JWT write|Zuordnung anlegen                                 |
-|PUT   |`/api/v1/zoos/<zoo>/enclosure_species/<id>`|JWT write|Zuordnung bearbeiten                              |
-|DELETE|`/api/v1/zoos/<zoo>/enclosure_species/<id>`|JWT write|Zuordnung löschen (inkl. `media`/`geo_points`)    |
+|GET   |`/api/v1/zoos/<zoo>/enclosure_species/<id>`|JWT read |Einzelne Zuordnung                                  |
+|POST  |`/api/v1/zoos/<zoo>/enclosure_species`     |JWT write|Zuordnung anlegen                                   |
+|PUT   |`/api/v1/zoos/<zoo>/enclosure_species/<id>`|JWT write|Zuordnung bearbeiten                                |
+|DELETE|`/api/v1/zoos/<zoo>/enclosure_species/<id>`|JWT write|Zuordnung löschen (inkl. `media`/`geo_points`)      |
 
-**Query-Parameter für GET:**
-
-- `?enclosure_id=<id>` — Filter nach Gehege
-- `?house_id=<id>` — Filter nach Tierhaus
-- `?domain_id=<id>` — Filter nach Domain (Enclosure, House oder enclosure_species selbst)
+**Query-Parameter für GET:** `?enclosure_id=`, `?house_id=`, `?domain_id=`
 
 **Zwei Wege für `feeding_times`/`births`:** entweder verschachtelt über
-`enclosure_species` (POST/PUT, delete-all-reinsert-Semantik, siehe unten),
-oder über die eigenständigen Sub-Resource-Endpoints weiter unten — beide
-Wege funktionieren parallel und schreiben in dieselben Tabellen.
-`enclosure_species_id` (und bei `births` zusätzlich `species_id`/`zoo_id`)
-kommen in beiden Fällen immer aus dem URL-/Parent-Kontext — der Client
-schickt sie nie mit.
-
-POST/PUT-Body (Auszug, verschachtelter Weg):
-
-```json
-{
-  "species_id": 42,
-  "enclosure_id": 7,
-  "feeding_times": ["09:00", "15:30"],
-  "births": [
-    {"birth_date": "2026-03-01", "count": 2, "note": "Zwillinge", "is_public": true}
-  ]
-}
-```
-
-- `feeding_times`: Liste von Uhrzeiten (`"HH:MM"`)
-- `births`: Liste von Objekten, `birth_date` Pflicht, `count` (Default `1`), `note`, `is_public` (Default `true`)
-- PUT ersetzt eine mitgeschickte Liste komplett (delete-all-reinsert); `[]` löscht alle Einträge, ein fehlendes Feld lässt bestehende Einträge unverändert
-- `species_id` ist über PUT nicht änderbar (400 bei Versuch)
+`enclosure_species` (POST/PUT, delete-all-reinsert-Semantik), oder über
+die eigenständigen Sub-Resource-Endpoints weiter unten — beide Wege
+funktionieren parallel. `enclosure_species_id` (und bei `births` zusätzlich
+`species_id`/`zoo_id`) kommen immer aus dem URL-/Parent-Kontext, nie vom
+Client.
 
 **DELETE-Verhalten (beim Löschen der enclosure_species selbst):**
 
-|Tabelle      |Verhalten                                              |
-|-------------|--------------------------------------------------------|
-|feeding_times|automatisch mitgelöscht (`ON DELETE CASCADE`)            |
-|births       |bleibt erhalten, `enclosure_species_id` wird `NULL` (historisches Faktum)|
-|geo_points   |wird explizit gelöscht (polymorph, keine FK möglich)     |
-|media        |wird explizit gelöscht inkl. physischer Datei (polymorph, keine FK möglich)|
+|Tabelle      |Verhalten                                                        |
+|-------------|------------------------------------------------------------------|
+|feeding_times|automatisch mitgelöscht (`ON DELETE CASCADE`)                      |
+|births       |bleibt erhalten, `enclosure_species_id` → `NULL` (historisch)     |
+|geo_points   |wird explizit gelöscht (polymorph, keine FK möglich)              |
+|media        |wird explizit gelöscht inkl. physischer Datei                     |
 
 -----
 
-### Feeding Times (eigenständige CRUD-Endpoints) ✨ neu
+### Feeding Times (eigenständige CRUD-Endpoints)
 
-|Method|Endpoint                                                       |Auth     |Beschreibung   |
-|------|----------------------------------------------------------------|---------|---------------|
-|GET   |`/api/v1/zoos/<zoo>/feeding_times`                               |JWT read |Alle im Zoo, optional `?species_id=<id>`|
-|GET   |`/api/v1/zoos/<zoo>/enclosure_species/<es_id>/feeding_times`     |JWT read |Liste          |
-|GET   |`/api/v1/zoos/<zoo>/enclosure_species/<es_id>/feeding_times/<id>`|JWT read |Einzeln        |
-|POST  |`/api/v1/zoos/<zoo>/enclosure_species/<es_id>/feeding_times`     |JWT write|Anlegen        |
-|PUT   |`/api/v1/zoos/<zoo>/enclosure_species/<es_id>/feeding_times/<id>`|JWT write|Bearbeiten     |
-|DELETE|`/api/v1/zoos/<zoo>/enclosure_species/<es_id>/feeding_times/<id>`|JWT write|Löschen        |
+|Method|Endpoint                                                        |Auth     |Beschreibung                             |
+|------|----------------------------------------------------------------|---------|-----------------------------------------|
+|GET   |`/api/v1/zoos/<zoo>/feeding_times`                              |JWT read |Alle im Zoo, optional `?species_id=<id>` |
+|GET   |`/api/v1/zoos/<zoo>/enclosure_species/<es_id>/feeding_times`    |JWT read |Liste                                    |
+|GET   |`/api/v1/zoos/<zoo>/enclosure_species/<es_id>/feeding_times/<id>`|JWT read |Einzeln                                  |
+|POST  |`/api/v1/zoos/<zoo>/enclosure_species/<es_id>/feeding_times`    |JWT write|Anlegen                                  |
+|PUT   |`/api/v1/zoos/<zoo>/enclosure_species/<es_id>/feeding_times/<id>`|JWT write|Bearbeiten                               |
+|DELETE|`/api/v1/zoos/<zoo>/enclosure_species/<es_id>/feeding_times/<id>`|JWT write|Löschen                                  |
 
-POST/PUT-Body: `feeding_time` (Pflicht bei POST, `"HH:MM"`), `day_of_week`
-(optional, 0=Mo…6=So, leer = täglich), `note` (optional), `is_public`
-(optional, Default `true`). PUT akzeptiert nur diese vier Felder — Versuch,
-`enclosure_species_id` o.ä. zu ändern, gibt `400`.
+POST/PUT-Body: `feeding_time` (Pflicht bei POST, `"HH:MM"`), `day_of_week` (0=Mo…6=So), `note`, `is_public` (Default `true`).
 
 -----
 
-### Births (eigenständige CRUD-Endpoints) ✨ neu
+### Births (eigenständige CRUD-Endpoints)
 
-|Method|Endpoint                                                 |Auth     |Beschreibung   |
-|------|-----------------------------------------------------------|---------|---------------|
-|GET   |`/api/v1/zoos/<zoo>/births`                               |JWT read |Alle im Zoo, optional `?species_id=<id>`|
-|GET   |`/api/v1/zoos/<zoo>/enclosure_species/<es_id>/births`     |JWT read |Liste          |
-|GET   |`/api/v1/zoos/<zoo>/enclosure_species/<es_id>/births/<id>`|JWT read |Einzeln        |
-|POST  |`/api/v1/zoos/<zoo>/enclosure_species/<es_id>/births`     |JWT write|Anlegen        |
-|PUT   |`/api/v1/zoos/<zoo>/enclosure_species/<es_id>/births/<id>`|JWT write|Bearbeiten     |
-|DELETE|`/api/v1/zoos/<zoo>/enclosure_species/<es_id>/births/<id>`|JWT write|Löschen        |
+|Method|Endpoint                                                  |Auth     |Beschreibung                             |
+|------|----------------------------------------------------------|---------|-----------------------------------------|
+|GET   |`/api/v1/zoos/<zoo>/births`                               |JWT read |Alle im Zoo, optional `?species_id=<id>` |
+|GET   |`/api/v1/zoos/<zoo>/enclosure_species/<es_id>/births`     |JWT read |Liste                                    |
+|GET   |`/api/v1/zoos/<zoo>/enclosure_species/<es_id>/births/<id>`|JWT read |Einzeln                                  |
+|POST  |`/api/v1/zoos/<zoo>/enclosure_species/<es_id>/births`     |JWT write|Anlegen                                  |
+|PUT   |`/api/v1/zoos/<zoo>/enclosure_species/<es_id>/births/<id>`|JWT write|Bearbeiten                               |
+|DELETE|`/api/v1/zoos/<zoo>/enclosure_species/<es_id>/births/<id>`|JWT write|Löschen                                  |
 
-POST/PUT-Body: `birth_date` (Pflicht bei POST, `"YYYY-MM-DD"`), `count`
-(optional, Default `1`), `note` (optional), `is_public` (optional, Default
-`true`). `species_id`/`zoo_id` werden serverseitig aus der
-`enclosure_species` übernommen — auch wenn der Client sie mitschickt,
-werden sie ignoriert. PUT akzeptiert nur `birth_date`/`count`/`note`/
-`is_public` — `400` bei anderen Feldern.
-
-> Anders als beim kaskadierenden Löschen über die enclosure_species selbst
-> (dort: `enclosure_species_id` → `NULL`, historisches Faktum bleibt
-> erhalten) löscht `DELETE .../births/<id>` die Zeile tatsächlich — gedacht
-> für die direkte Korrektur einer einzelnen Fehleingabe.
-
-`GET /api/v1/zoos/<zoo>/births` nutzt die eigene `zoo_id`-Spalte von
-`births` direkt (kein Join über `enclosure_species` nötig) — births deren
-`enclosure_species` inzwischen gelöscht wurde (`enclosure_species_id` ist
-dann `NULL`) tauchen hier weiterhin auf.
+POST/PUT-Body: `birth_date` (Pflicht bei POST, `"YYYY-MM-DD"`), `count` (Default `1`), `note`, `is_public` (Default `true`). `species_id`/`zoo_id` kommen serverseitig aus der `enclosure_species`, nie vom Client. `GET /api/v1/zoos/<zoo>/births` nutzt die eigene `zoo_id`-Spalte — births überleben auch dann, wenn ihre `enclosure_species` gelöscht wurde (`enclosure_species_id = NULL`).
 
 -----
 
-## Domains (Zoo-Bereiche)
+## Domains
 
-|Method|Endpoint                         |Auth     |Beschreibung                          |
-|------|---------------------------------|---------|--------------------------------------|
-|GET   |`/api/v1/zoos/<zoo>/domains`     |JWT read |Alle Domains (zoo-spezifisch + global)|
-|GET   |`/api/v1/zoos/<zoo>/domains/<id>`|JWT read |Einzelne Domain                       |
-|POST  |`/api/v1/zoos/<zoo>/domains`     |JWT write|Domain anlegen                        |
-|PUT   |`/api/v1/zoos/<zoo>/domains/<id>`|JWT write|Domain bearbeiten                     |
-|DELETE|`/api/v1/zoos/<zoo>/domains/<id>`|JWT write|Domain löschen                        |
+|Method|Endpoint                             |Auth     |Beschreibung    |
+|------|-------------------------------------|---------|----------------|
+|GET   |`/api/v1/zoos/<zoo>/domains`         |JWT read |Alle Domains    |
+|GET   |`/api/v1/zoos/<zoo>/domains/<id>`    |JWT read |Domain-Details  |
+|POST  |`/api/v1/zoos/<zoo>/domains`         |JWT write|Domain anlegen  |
+|PUT   |`/api/v1/zoos/<zoo>/domains/<id>`    |JWT write|Domain bearbeiten|
+|DELETE|`/api/v1/zoos/<zoo>/domains/<id>`    |JWT write|Domain löschen  |
 
 -----
 
 ## Locations (Infrastruktur-POIs)
 
-Toiletten, Restaurants, Spielplätze, Eingänge, etc.
+|Method|Endpoint                            |Auth     |Beschreibung                |
+|------|------------------------------------|---------|----------------------------|
+|GET   |`/api/v1/zoos/<zoo>/locations`      |JWT read |Alle POIs                   |
+|GET   |`/api/v1/zoos/<zoo>/locations/<id>` |JWT read |POI-Details + Öffnungszeiten|
+|POST  |`/api/v1/zoos/<zoo>/locations`      |JWT write|POI anlegen                 |
+|PUT   |`/api/v1/zoos/<zoo>/locations/<id>` |JWT write|POI bearbeiten              |
+|DELETE|`/api/v1/zoos/<zoo>/locations/<id>` |JWT write|POI löschen (inkl. Media)   |
 
-|Method|Endpoint                           |Auth     |Beschreibung                    |
-|------|-----------------------------------|---------|--------------------------------|
-|GET   |`/api/v1/zoos/<zoo>/locations`     |JWT read |Alle Infrastruktur-POIs         |
-|GET   |`/api/v1/zoos/<zoo>/locations/<id>`|JWT read |POI-Details inkl. Öffnungszeiten|
-|POST  |`/api/v1/zoos/<zoo>/locations`     |JWT write|POI anlegen                     |
-|PUT   |`/api/v1/zoos/<zoo>/locations/<id>`|JWT write|POI bearbeiten                  |
-|DELETE|`/api/v1/zoos/<zoo>/locations/<id>`|JWT write|POI löschen                     |
+Beim Anlegen (`POST`) wird automatisch ein `zoo.media`-Eintrag für das Icon
+angelegt, sofern `location_type_id` gesetzt ist:
+`storage_path = zoo/<zoo_slug>/locations/`, `filename = <location_type.icon>.png`.
+`icon_media_id` wird direkt auf `zoo.locations` gesetzt. Beim Löschen wird
+der Media-DB-Eintrag mitgelöscht, die Datei bleibt auf Disk.
 
------
+Öffnungszeiten werden als `opening_hours[]`-Array in `GET /locations/<id>`
+mitgeliefert und über die Sub-Resource
+`/locations/<id>/opening_hours` (CRUD) verwaltet — siehe
+Abschnitt [Öffnungszeiten](#öffnungszeiten).
 
-## Location Types (Infrastruktur-Typen) ✨ neu
-
-Vordefinierte Typen für Infrastruktur-POIs (Toilette, Restaurant, Spielplatz, …).  
-Lesen: alle JWT-User. Schreiben: nur super_admin.
-
-|Method|Endpoint                     |Auth           |Beschreibung          |
-|------|-----------------------------|---------------|----------------------|
-|GET   |`/api/v1/location-types`     |JWT            |Alle Location-Typen   |
-|GET   |`/api/v1/location-types/<id>`|JWT            |Einzelner Location-Typ|
-|POST  |`/api/v1/location-types`     |JWT super_admin|Typ anlegen           |
-|PUT   |`/api/v1/location-types/<id>`|JWT super_admin|Typ bearbeiten        |
-|DELETE|`/api/v1/location-types/<id>`|JWT super_admin|Typ löschen           |
-
-
-> DELETE schlägt mit `409` fehl wenn noch Locations diesen Typ verwenden.
+**Erlaubte Felder für PUT:**
+`name`, `name_display`, `description`, `location_type`, `location_type_id`,
+`sort_order`, `domain_id`, `url`, `description_long`, `latitude`, `longitude`.
+`time_open`/`time_close` existieren auf Locations **nicht** — Öffnungszeiten
+laufen über die Sub-Resource `.../opening_hours`.
 
 -----
 
-## Species (Tierarten)
+## Location Types
 
-|Method|Endpoint                    |Auth     |Beschreibung                        |
-|------|----------------------------|---------|------------------------------------|
-|GET   |`/api/v1/species?search=<q>`|JWT      |Globale Suche (deutsch + lateinisch)|
-|POST  |`/api/v1/species`           |JWT write (global)|Tierart anlegen                     |
-|DELETE|`/api/v1/species/<id>`      |JWT super_admin|Tierart löschen (`409` falls noch `enclosure_species`/`births` verknüpft)|
-|GET   |`/api/v1/zoos/<zoo>/species`|JWT read |Artenliste pro Zoo                  |
-
-**Query-Parameter für `/api/v1/zoos/<zoo>/species`:**
-
-- `?search=Löwe` — Suche in deutschem oder lateinischem Namen
-- `?domain_id=3` — Filter nach Domain
+|Method|Endpoint                                        |Auth     |Beschreibung              |
+|------|------------------------------------------------|---------|--------------------------|
+|GET   |`/api/v1/location-types`                        |JWT read |Alle Typen                |
+|GET   |`/api/v1/location-types/<id>`                   |JWT read |Typ-Details               |
+|POST  |`/api/v1/location-types`                        |JWT write|Typ anlegen               |
+|PUT   |`/api/v1/location-types/<id>`                   |JWT write|Typ bearbeiten            |
+|DELETE|`/api/v1/location-types/<id>`                   |JWT write|Typ löschen               |
 
 -----
 
-## Media (Bilder)
+## Species
 
-|Method|Endpoint                                      |Auth     |Beschreibung                |
-|------|----------------------------------------------|---------|----------------------------|
-|GET   |`/api/v1/media/<entity_type>/<id>`            |JWT      |Media-Liste für eine Entität|
-|POST  |`/api/v1/media/<entity_type>/<id>`            |JWT write|Bild hochladen              |
-|DELETE|`/api/v1/media/<id>?zoo=<slug>`               |JWT write|Bild löschen                |
-|GET   |`/api/v1/files/<zoo>/<entity_type>/<filename>`|JWT read |Bild abrufen                |
+|Method|Endpoint                   |Auth              |Beschreibung              |
+|------|---------------------------|------------------|--------------------------|
+|GET   |`/api/v1/species`          |JWT               |Alle validen Species      |
+|GET   |`/api/v1/species/<id>`     |JWT               |Species-Details           |
+|POST  |`/api/v1/species`          |JWT write (global)|Species anlegen           |
+|PUT   |`/api/v1/species/<id>`     |JWT super_admin   |Species bearbeiten        |
+|DELETE|`/api/v1/species/<id>`     |JWT super_admin   |Species löschen           |
 
-**Erlaubte `entity_type`-Werte:**
-`zoo`, `species`, `enclosure`, `enclosure_species`, `house`, `location`, `domain`
+**POST — automatische Wikidata-Anreicherung:** beim Anlegen wird synchron
+(`blocking`) ein SPARQL-Call gegen Wikidata abgesetzt. Abgerufen werden:
+latin_name (P225), Taxonomie (P171/P105: Kingdom, Phylum, Class, Order,
+Family, Genus), IUCN-Status (P141), Populationstrend (P2241), IUCN-Taxon-ID
+(P627), GBIF Taxon Key (P846). Alle Felder werden direkt in `zoo.species`
+gespeichert. Ist kein Wikidata-Call möglich (kein `wikidata_id` angegeben
+oder SPARQL-Fehler), wird trotzdem eine Species angelegt, nur ohne
+angereicherte Daten.
 
-> `species` ist zoo-übergreifend (global) — der gespeicherte Pfad hat hier
-> kein `<zoo>`-Segment, sondern die Form `species/<filename>`.
+**POST — automatischer Media-Eintrag:** nach dem Species-INSERT wird
+automatisch ein `zoo.media`-Eintrag für das Icon angelegt und `icon_media_id`
+direkt gesetzt:
+`storage_path = species/`, `filename = <wikidata_id>_<latin_name>.png`
+(Leerzeichen → Unterstrich). Nur wenn `wikidata_id` vorhanden ist.
 
-**Erlaubte Formate:** JPEG, PNG, WebP · **Max. Größe:** 10 MB · SVG verboten  
-**Dateiendung** wird strikt an MIME-Typ gebunden (Fix Juni 2026).
+**DELETE:** schlägt mit `409` fehl, wenn noch `enclosure_species` oder
+`births` verknüpft sind. Media-DB-Eintrag wird mitgelöscht, Datei bleibt
+auf Disk.
+
+Media-Pfad-Ausnahme bei Datei-Auslieferung: Species-Icons liegen unter
+`media/species/` (physischer Pfad), aber `storage_path` in der DB ist
+`species/` (ohne `media/`-Prefix).
+
+-----
+
+## Media
+
+|Method|Endpoint                           |Auth              |Beschreibung                   |
+|------|-----------------------------------|------------------|-------------------------------|
+|POST  |`/api/v1/media/<entity_type>/<id>` |JWT write (global)|Datei hochladen (multipart)    |
+|GET   |`/api/v1/media/<entity_type>/<id>` |JWT read          |Media-Einträge einer Entity    |
+|DELETE|`/api/v1/media/<id>`               |JWT write (global)|Media-Eintrag löschen          |
+|GET   |`/media/<path>`                    |App-Token oder JWT|Datei ausliefern               |
+
+`entity_type`: `species`, `enclosure_species`, `location`, `house`, `zoo`, `domain`
+
+-----
+
+## Zoo Species
+
+|Method|Endpoint                        |Auth    |Beschreibung                        |
+|------|--------------------------------|--------|------------------------------------|
+|GET   |`/api/v1/zoos/<zoo>/species`    |JWT read|Species des Zoos (aus enclosure_species)|
+
+-----
+
+## Öffnungszeiten
+
+Öffnungszeiten existieren an drei Stellen im System, alle mit identischer
+Struktur (separate Zeile pro Wochentag, optional Gültigkeitszeitraum).
+Jede Entität kann mehrere Einträge pro Wochentag haben (z.B. Sommer- vs.
+Winterzeit über `valid_from`/`valid_until` unterschieden).
+
+|Tabelle                 |Zugehörig zu|Endpoints                                          |
+|------------------------|------------|---------------------------------------------------|
+|`zoo.zoo_opening_hours` |Zoo         |`/api/v1/zoos/<zoo>/opening_hours`                 |
+|`zoo.opening_hours`     |Location-POI|`/api/v1/zoos/<zoo>/locations/<id>/opening_hours`  |
+|`zoo.house_opening_hours`|Tierhaus   |`/api/v1/zoos/<zoo>/houses/<id>/opening_hours`     |
+
+### Zoo-Öffnungszeiten
+
+|Method|Endpoint                                   |Auth     |Beschreibung|
+|------|-------------------------------------------|---------|------------|
+|GET   |`/api/v1/zoos/<zoo>/opening_hours`         |JWT read |Liste       |
+|GET   |`/api/v1/zoos/<zoo>/opening_hours/<id>`    |JWT read |Einzeln     |
+|POST  |`/api/v1/zoos/<zoo>/opening_hours`         |JWT write|Anlegen     |
+|PUT   |`/api/v1/zoos/<zoo>/opening_hours/<id>`    |JWT write|Bearbeiten  |
+|DELETE|`/api/v1/zoos/<zoo>/opening_hours/<id>`    |JWT write|Löschen     |
+
+### Location-Öffnungszeiten
+
+|Method|Endpoint                                                        |Auth     |Beschreibung|
+|------|----------------------------------------------------------------|---------|------------|
+|GET   |`/api/v1/zoos/<zoo>/locations/<loc_id>/opening_hours`           |JWT read |Liste       |
+|GET   |`/api/v1/zoos/<zoo>/locations/<loc_id>/opening_hours/<id>`      |JWT read |Einzeln     |
+|POST  |`/api/v1/zoos/<zoo>/locations/<loc_id>/opening_hours`           |JWT write|Anlegen     |
+|PUT   |`/api/v1/zoos/<zoo>/locations/<loc_id>/opening_hours/<id>`      |JWT write|Bearbeiten  |
+|DELETE|`/api/v1/zoos/<zoo>/locations/<loc_id>/opening_hours/<id>`      |JWT write|Löschen     |
+
+### House-Öffnungszeiten
+
+|Method|Endpoint                                                           |Auth     |Beschreibung|
+|------|-------------------------------------------------------------------|---------|------------|
+|GET   |`/api/v1/zoos/<zoo>/houses/<house_id>/opening_hours`               |JWT read |Liste       |
+|GET   |`/api/v1/zoos/<zoo>/houses/<house_id>/opening_hours/<id>`          |JWT read |Einzeln     |
+|POST  |`/api/v1/zoos/<zoo>/houses/<house_id>/opening_hours`               |JWT write|Anlegen     |
+|PUT   |`/api/v1/zoos/<zoo>/houses/<house_id>/opening_hours/<id>`          |JWT write|Bearbeiten  |
+|DELETE|`/api/v1/zoos/<zoo>/houses/<house_id>/opening_hours/<id>`          |JWT write|Löschen     |
+
+**POST/PUT-Body** (alle drei identisch):
+
+```json
+{
+  "day_of_week": "monday",
+  "open_time":   "09:00",
+  "close_time":  "18:00",
+  "valid_from":  "2026-04-01",
+  "valid_until": "2026-10-31",
+  "label":       "Sommerzeit"
+}
+```
+
+- `day_of_week`: Pflicht bei POST. Erlaubte Werte: `monday`, `tuesday`, `wednesday`, `thursday`, `friday`, `saturday`, `sunday`. `null` = täglich gültig.
+- `open_time` / `close_time`: `"HH:MM"` — beim Lesen kommt `"HH:MM:SS"` zurück (PostgreSQL `time`-Typ)
+- `valid_from` / `valid_until`: `"YYYY-MM-DD"` oder `null` (= immer gültig)
+- `label`: optionaler Beschriftungstext, z.B. `"Sommerzeit"`, `"Feiertage"`
+
+**Wichtig für den iOS-Agent:** `time_open`/`time_close` sind separate Felder
+direkt auf `zoo.zoos` (eine einzige globale Öffnungszeit ohne Wochentag),
+editierbar über `PUT /api/v1/admin/zoos/<zoo>`. Diese Felder existieren
+**nicht** auf Locations oder Houses — `PUT /locations/<id>` und
+`PUT /houses/<id>` lehnen `time_open`/`time_close` mit `400 Unknown fields`
+ab. Öffnungszeiten für Locations und Houses immer über die Sub-Resource
+`.../opening_hours` verwalten.
+
+`GET /api/v1/zoos/<zoo>/locations/<id>` und
+`GET /api/v1/zoos/<zoo>/houses/<id>` liefern die Öffnungszeiten bereits als
+verschachteltes `opening_hours[]`-Array mit — separate Calls auf die
+Sub-Resource sind nur für Write-Operationen nötig.
 
 -----
 
@@ -340,6 +400,8 @@ Gibt `409` wenn bereits ein Export für diesen Zoo läuft.
 |GET   |`/feed`      |—   |Zoo-Verzeichnis (JSON)|
 |GET   |`/feed/<zoo>`|—   |Zoo-Feed (RSS 2.0)    |
 
+CORS (`Access-Control-Allow-Origin: *`) auf beiden Feed-Endpoints.
+
 -----
 
 ## Admin — Zoos
@@ -348,14 +410,13 @@ Gibt `409` wenn bereits ein Export für diesen Zoo läuft.
 |------|--------------------------|------------------------------|----------------|
 |GET   |`/api/v1/admin/zoos`      |JWT super_admin               |Zoo-Liste       |
 |GET   |`/api/v1/admin/zoos/<zoo>`|JWT super_admin / tenant_admin|Zoo-Details     |
-
-`GET /api/v1/admin/zoos/<zoo>` liefert dieselben Medien-Felder
-(`icon_media_path`, `map_overlay_1_path` … `map_overlay_5_path`,
-`icon_url`, `map_overlay`) wie der app-seitige Endpoint — siehe
-[Zoos](#zoos) oben.
 |POST  |`/api/v1/admin/zoos`      |JWT super_admin               |Zoo anlegen     |
 |PUT   |`/api/v1/admin/zoos/<zoo>`|JWT super_admin / tenant_admin|Zoo bearbeiten  |
 |DELETE|`/api/v1/admin/zoos/<zoo>`|JWT super_admin               |Zoo deaktivieren|
+
+`GET /api/v1/admin/zoos/<zoo>` liefert dieselben Medien-Felder
+(`icon_media_path`, `map_overlay_1_path` … `map_overlay_5_path`,
+`icon_url`, `map_overlay`) wie der app-seitige Endpoint.
 
 -----
 
@@ -417,28 +478,30 @@ Gibt `409` wenn bereits ein Export für diesen Zoo läuft.
 
 ## Zusammenfassung
 
-|Gruppe        |Endpoints|Änderung                       |
-|--------------|---------|-------------------------------|
-|System        |3        |                               |
-|Auth          |9        |                               |
-|Zoos          |2        |                               |
-|Enclosures    |4        |                               |
-|Houses        |5        |                               |
-|Enclosure Species|5     |✨ +1 GET-Single                |
-|Feeding Times |6        |✨ neu                          |
-|Births        |6        |✨ neu                          |
-|Domains       |5        |✨ +4 (POST/PUT/DELETE + GET id)|
-|Locations     |5        |✨ neu                          |
-|Location Types|5        |✨ neu                          |
-|Species       |4        |                               |
-|Media         |4        |✨ +domain entity_type          |
-|Feedback      |6        |                               |
-|Publish       |1        |                               |
-|SQLite        |1        |                               |
-|RSS-Feed      |2        |                               |
-|Admin Zoos    |5        |                               |
-|Admin Tenants |7        |                               |
-|Admin Users   |4        |                               |
-|Admin Rollen  |6        |                               |
-|Admin System  |7        |                               |
-|**Gesamt**    |**102**  |**+22 gegenüber V1**            |
+|Gruppe           |Endpoints|Hinweis                                    |
+|-----------------|---------|-------------------------------------------|
+|System           |3        |                                           |
+|Auth             |9        |                                           |
+|Zoos             |2        |icon_media_path + map_overlay_1..5_path    |
+|Enclosures       |4        |                                           |
+|Houses           |5        |                                           |
+|Enclosure Species|5        |                                           |
+|Feeding Times    |6        |inkl. zoo-weiter Liste                     |
+|Births           |6        |inkl. zoo-weiter Liste                     |
+|Öffnungszeiten   |15       |Zoo + Locations + Houses, je 5 Endpoints   |
+|Domains          |5        |                                           |
+|Locations        |5        |Auto-Media-Eintrag beim Anlegen            |
+|Location Types   |5        |                                           |
+|Species          |5        |Auto-Wikidata + Auto-Media-Eintrag         |
+|Zoo Species      |1        |                                           |
+|Media            |4        |                                           |
+|Feedback         |6        |                                           |
+|Publish          |1        |                                           |
+|SQLite           |1        |                                           |
+|RSS-Feed         |2        |CORS                                       |
+|Admin Zoos       |5        |                                           |
+|Admin Tenants    |7        |                                           |
+|Admin Users      |4        |                                           |
+|Admin Rollen     |6        |                                           |
+|Admin System     |7        |                                           |
+|**Gesamt**       |**119**  |                                           |

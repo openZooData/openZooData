@@ -10,6 +10,7 @@ from .enclosure import enclosure_bp
 from .enclosure_species import enclosure_species_bp
 from .feeding_times import feeding_times_bp
 from .births import births_bp
+from .opening_hours import opening_hours_bp
 
 def register_zoo_blueprints(app):
     app.register_blueprint(zoos_bp)
@@ -24,3 +25,4 @@ def register_zoo_blueprints(app):
     app.register_blueprint(enclosure_species_bp)
     app.register_blueprint(feeding_times_bp)
     app.register_blueprint(births_bp)
+    app.register_blueprint(opening_hours_bp)
