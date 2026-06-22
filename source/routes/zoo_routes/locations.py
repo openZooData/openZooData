@@ -159,6 +159,32 @@ def create_location(zoo):
                     VALUES ('location', %s, %s, %s)
                     ON CONFLICT DO NOTHING
                 """, (location_id, lat, lon))
+
+            # Media-Eintrag für Icon anlegen und icon_media_id direkt verknüpfen.
+            # Dateiname kommt aus location_type.icon (falls location_type_id gesetzt).
+            location_type_id = data.get("location_type_id")
+            if location_type_id:
+                cur.execute("""
+                    SELECT icon FROM zoo.location_types WHERE id = %s
+                """, (location_type_id,))
+                lt_row = cur.fetchone()
+                if lt_row and lt_row["icon"]:
+                    filename = f"{lt_row['icon']}.png"
+                    cur.execute("""
+                        INSERT INTO zoo.media
+                            (entity_type, entity_id, zoo_id, storage_path,
+                             filename, mime_type, label)
+                        VALUES ('location', %s, %s, %s, %s, 'image/png', 'icon')
+                        RETURNING id
+                    """, (
+                        location_id, zoo_row["id"],
+                        f"locations/{zoo}/locations/",
+                        filename
+                    ))
+                    media_id = cur.fetchone()["id"]
+                    cur.execute("""
+                        UPDATE zoo.locations SET icon_media_id = %s WHERE id = %s
+                    """, (media_id, location_id))
         pg.commit()
         return jsonify({"id": location_id, "message": "Created"}), 201
     except Exception:
@@ -241,6 +267,12 @@ def delete_location(zoo, location_id):
     try:
         pg = get_pg_connection()
         with pg.cursor() as cur:
+            # Media-Eintrag mitlöschen (Datei bleibt auf Disk)
+            cur.execute("""
+                DELETE FROM zoo.media
+                WHERE entity_type = 'location' AND entity_id = %s
+            """, (location_id,))
+
             cur.execute("""
                 DELETE FROM zoo.locations
                 WHERE id = %s
