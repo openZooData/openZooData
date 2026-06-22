@@ -13,7 +13,8 @@ import psycopg2.extras
 from flask import Blueprint, jsonify, request
 from db import get_pg_connection
 from extensions import limiter
-from helpers.authz import require_authenticated, require_super_admin, require_any_write_access
+from helpers.authz import require_authenticated, require_super_admin, require_zoo_access, require_any_write_access
+from helpers.wikidata import fetch_species_data, build_species_filename
 
 species_bp = Blueprint("species", __name__)
 
@@ -127,23 +128,65 @@ def create_species():
     if not german_name:
         return jsonify({"error": "german_name required"}), 400
 
+    # Wikidata-Anreicherung (blocking) — vor DB-Write, damit latin_name
+    # für den Dateinamen bekannt ist.
+    wiki_data = {}
+    if wikidata_id:
+        wiki_data = fetch_species_data(wikidata_id)
+        if wiki_data.get("latin_name") and not latin_name:
+            latin_name = wiki_data["latin_name"]
+
     pg = None
     try:
         pg = get_pg_connection()
         with pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
-                INSERT INTO zoo.species (german_name, latin_name, wikidata_id, id_valid)
-                VALUES (%s, %s, %s, %s)
+                INSERT INTO zoo.species (german_name, latin_name, wikidata_id, id_valid,
+                    tax_kingdom_id, tax_phylum_id, tax_class_id, tax_order_id,
+                    tax_family_id, tax_genus_id, iucn_status_id,
+                    iucn_population_trend_id, iucn_id, gbif_taxon_key)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id, german_name, latin_name, wikidata_id, id_valid
-            """, (german_name, latin_name, wikidata_id, bool(wikidata_id)))
+            """, (
+                german_name, latin_name, wikidata_id, bool(wikidata_id),
+                wiki_data.get("tax_kingdom_id"),
+                wiki_data.get("tax_phylum_id"),
+                wiki_data.get("tax_class_id"),
+                wiki_data.get("tax_order_id"),
+                wiki_data.get("tax_family_id"),
+                wiki_data.get("tax_genus_id"),
+                wiki_data.get("iucn_status_id"),
+                wiki_data.get("iucn_population_trend_id"),
+                wiki_data.get("iucn_id"),
+                wiki_data.get("gbif_taxon_key"),
+            ))
             new_species = dict(cur.fetchone())
+            species_id  = new_species["id"]
 
             # Leeren translations-Eintrag anlegen
             cur.execute("""
                 INSERT INTO zoo.translations (entity_type, entity_id, de)
                 VALUES ('species', %s, %s)
                 ON CONFLICT DO NOTHING
-            """, (new_species["id"], german_name))
+            """, (species_id, german_name))
+
+            # Media-Eintrag für Icon anlegen und icon_media_id direkt verknüpfen
+            if wikidata_id:
+                filename = build_species_filename(
+                    wikidata_id, new_species.get("latin_name"))
+                cur.execute("""
+                    INSERT INTO zoo.media
+                        (entity_type, entity_id, storage_path, filename,
+                         mime_type, label)
+                    VALUES ('species', %s, 'species/', %s, 'image/png', 'icon')
+                    RETURNING id
+                """, (species_id, filename))
+                media_id = cur.fetchone()["id"]
+                cur.execute("""
+                    UPDATE zoo.species SET icon_media_id = %s WHERE id = %s
+                """, (media_id, species_id))
+                new_species["icon_media_id"] = media_id
+                new_species["icon_filename"]  = filename
 
         pg.commit()
         return jsonify({
@@ -253,6 +296,13 @@ def delete_species(species_id):
             cur.execute("DELETE FROM zoo.species WHERE id = %s", (species_id,))
             if cur.rowcount == 0:
                 return jsonify({"error": "Species not found"}), 404
+
+            # Media-Eintrag mitlöschen (Datei bleibt auf Disk,
+            # nur der DB-Eintrag wird entfernt).
+            cur.execute("""
+                DELETE FROM zoo.media
+                WHERE entity_type = 'species' AND entity_id = %s
+            """, (species_id,))
 
         pg.commit()
         return jsonify({"message": "Deleted"}), 200
