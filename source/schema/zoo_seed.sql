@@ -27,26 +27,26 @@ ON CONFLICT (id) DO NOTHING;
 -- -----------------------------------------------------------------------
 INSERT INTO zoo.location_types (id, slug, name, icon, sort_order)
 VALUES
-  (1,  'wc',                  'WC',                  'restroom',        1),
-  (2,  'wickelraum',          'Wickelraum',          'baby-carriage',   2),
-  (3,  'spielplatz',          'Spielplatz',          'playground',      3),
-  (4,  'restaurant',          'Restaurant',          'fork-knife',      4),
-  (5,  'kiosk',               'Kiosk',               'coffee',          5),
-  (6,  'eis',                 'Eis',                 'ice-cream',       6),
-  (7,  'shop',                'Shop',                'shopping-bag',    7),
-  (8,  'eingang',             'Eingang',             'door-enter',      8),
-  (9,  'ausgang',             'Ausgang',             'door-exit',       9),
-  (10, 'backstube',           'Backstube',           'bread',           10),
+  (1,  'wc',                  'WC',                  'WC',        1),
+  (2,  'wickelraum',          'Wickelraum',          'Wickelraum',   2),
+  (3,  'spielplatz',          'Spielplatz',          'Spielplatz',      3),
+  (4,  'restaurant',          'Restaurant',          'Restaurant',      4),
+  (5,  'kiosk',               'Kiosk',               'Kiosk',          5),
+  (6,  'eis',                 'Eis',                 'Eis',       6),
+  (7,  'shop',                'Shop',                'Shop',    7),
+  (8,  'eingang',             'Eingang',             'Eingang',      8),
+  (9,  'ausgang',             'Ausgang',             'Ausgang',       9),
+  (10, 'backstube',           'Backstube',           'Bakery',           10),
   (11, 'sonstiges',           'Sonstiges',           'dots',            99),
-  (12, 'museum',              'Museum',              'building',        11),
+  (12, 'museum',              'Museum',              'Museum',        11),
   (13, 'attraktion',          'Attraktion',          'star',            12),
   (14, 'service',             'Service',             'tool',            13),
-  (15, 'behindertentoilette', 'Behindertentoilette', 'accessible',      3),
+  (15, 'behindertentoilette', 'Behindertentoilette', 'Behinderten WC',      3),
   (16, 'aussichtsplattform',  'Aussichtsplattform',  'Aussichtsplattform', 15),
-  (17, 'bluehwiese',          'Blühwiese',           'flower',          0),
-  (18, 'streichelzoo',        'Streichelzoo',        'hand',            0),
-  (19, 'photo',               'Photo',               'camera',          0),
-  (20, 'info',                'Info',                'info-circle',     0)
+  (17, 'bluehwiese',          'Blühwiese',           'Bluehwiese',          0),
+  (18, 'streichelzoo',        'Streichelzoo',        'Streichelzoo',            0),
+  (19, 'photo',               'Photo',               'Photobooth',          0),
+  (20, 'info',                'Info',                'Info',     0)
 ON CONFLICT (id) DO NOTHING;
 
 SELECT setval('zoo.location_types_id_seq', (SELECT max(id) FROM zoo.location_types));
