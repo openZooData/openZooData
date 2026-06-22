@@ -178,7 +178,7 @@ def create_location(zoo):
                         RETURNING id
                     """, (
                         location_id, zoo_row["id"],
-                        f"locations/{zoo}/locations/",
+                        f"zoo/{zoo}/locations/",
                         filename
                     ))
                     media_id = cur.fetchone()["id"]
