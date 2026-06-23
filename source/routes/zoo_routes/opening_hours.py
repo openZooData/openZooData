@@ -236,7 +236,7 @@ def update_zoo_opening_hour(zoo, oh_id):
     pg = None
     try:
         pg = get_pg_connection()
-        with pg.cursor() as cur:
+        with pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             zoo_id = _get_zoo_id(cur, zoo)
             if not zoo_id:
                 return jsonify({"error": "Zoo not found"}), 404
@@ -268,7 +268,7 @@ def delete_zoo_opening_hour(zoo, oh_id):
     pg = None
     try:
         pg = get_pg_connection()
-        with pg.cursor() as cur:
+        with pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             zoo_id = _get_zoo_id(cur, zoo)
             if not zoo_id:
                 return jsonify({"error": "Zoo not found"}), 404
@@ -415,7 +415,7 @@ def update_location_opening_hour(zoo, loc_id, oh_id):
     pg = None
     try:
         pg = get_pg_connection()
-        with pg.cursor() as cur:
+        with pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             if not _get_location_or_404(cur, zoo, loc_id):
                 return jsonify({"error": "Location not found"}), 404
             set_clauses = ", ".join(f"{k} = %s" for k in data)
@@ -447,7 +447,7 @@ def delete_location_opening_hour(zoo, loc_id, oh_id):
     pg = None
     try:
         pg = get_pg_connection()
-        with pg.cursor() as cur:
+        with pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             if not _get_location_or_404(cur, zoo, loc_id):
                 return jsonify({"error": "Location not found"}), 404
             cur.execute("""
@@ -593,7 +593,7 @@ def update_house_opening_hour(zoo, house_id, oh_id):
     pg = None
     try:
         pg = get_pg_connection()
-        with pg.cursor() as cur:
+        with pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             if not _get_house_or_404(cur, zoo, house_id):
                 return jsonify({"error": "House not found"}), 404
             set_clauses = ", ".join(f"{k} = %s" for k in data)
@@ -625,7 +625,7 @@ def delete_house_opening_hour(zoo, house_id, oh_id):
     pg = None
     try:
         pg = get_pg_connection()
-        with pg.cursor() as cur:
+        with pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             if not _get_house_or_404(cur, zoo, house_id):
                 return jsonify({"error": "House not found"}), 404
             cur.execute("""
