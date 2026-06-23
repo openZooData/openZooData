@@ -112,7 +112,7 @@ require_var AUTH_NAME
 # ---------------------------------------------------------------------------
 
 TIMESTAMP="$(date +"%Y%m%d_%H%M%S")"
-BACKUP_ROOT="${BACKUP_ROOT:-${SCRIPT_DIR}/backup}"
+BACKUP_ROOT="${BACKUP_ROOT:-${ROOT_DIR}/backup}"
 BACKUP_DIR="${BACKUP_ROOT}/${TIMESTAMP}"
 
 mkdir -p "${BACKUP_DIR}"

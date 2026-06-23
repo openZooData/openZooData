@@ -2,13 +2,15 @@
 -- PostgreSQL database dump
 --
 
+\restrict IgqNeTZRhgkGviizlzhIQ1H2a5tMYifuU7rXNcmpA4yDUxy7GY0XzrvFClIwEjg
 
--- Dumped from database version 15.18 (Debian 15.18-0+deb12u1)
--- Dumped by pg_dump version 15.18 (Debian 15.18-0+deb12u1)
+-- Dumped from database version 18.4 (Debian 18.4-1.pgdg13+1)
+-- Dumped by pg_dump version 18.4
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
+SET transaction_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
 SELECT pg_catalog.set_config('search_path', '', false);
@@ -21,14 +23,7 @@ SET row_security = off;
 -- Name: community; Type: SCHEMA; Schema: -; Owner: -
 --
 
-CREATE SCHEMA IF NOT EXISTS community;
-
-
---
--- Name: public; Type: SCHEMA; Schema: -; Owner: -
---
-
--- *not* creating schema, since initdb creates it
+CREATE SCHEMA community;
 
 
 --
@@ -42,7 +37,7 @@ COMMENT ON SCHEMA public IS '';
 -- Name: zoo; Type: SCHEMA; Schema: -; Owner: -
 --
 
-CREATE SCHEMA IF NOT EXISTS zoo;
+CREATE SCHEMA zoo;
 
 
 SET default_tablespace = '';
@@ -66,7 +61,7 @@ CREATE TABLE community.change_proposals (
     review_note text,
     created_at timestamp with time zone DEFAULT now(),
     published_at timestamp with time zone,
-    CONSTRAINT change_proposals_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'approved'::character varying, 'rejected'::character varying, 'published'::character varying])::text[])))
+    CONSTRAINT change_proposals_status_check CHECK (((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('approved'::character varying)::text, ('rejected'::character varying)::text, ('published'::character varying)::text])))
 );
 
 
@@ -187,7 +182,7 @@ CREATE TABLE community.releases (
     release_notes text,
     published_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now(),
-    CONSTRAINT releases_status_check CHECK (((status)::text = ANY ((ARRAY['draft'::character varying, 'published'::character varying])::text[])))
+    CONSTRAINT releases_status_check CHECK (((status)::text = ANY (ARRAY[('draft'::character varying)::text, ('published'::character varying)::text])))
 );
 
 
@@ -218,13 +213,13 @@ ALTER SEQUENCE community.releases_id_seq OWNED BY community.releases.id;
 CREATE TABLE zoo.births (
     id integer NOT NULL,
     zoo_id integer NOT NULL,
-    enclosure_species_id integer,
     species_id integer NOT NULL,
     birth_date date NOT NULL,
     count smallint DEFAULT 1,
     note text,
     is_public boolean DEFAULT true,
-    created_at timestamp with time zone DEFAULT now()
+    created_at timestamp with time zone DEFAULT now(),
+    enclosure_species_id integer
 );
 
 
@@ -290,14 +285,16 @@ ALTER SEQUENCE zoo.domains_id_seq OWNED BY zoo.domains.id;
 --
 
 CREATE TABLE zoo.enclosure_species (
-    enclosure_species_id integer,
+    enclosure_id integer,
     species_id integer NOT NULL,
     note text,
     count_adult smallint,
     count_juvenile smallint,
     counted_at timestamp with time zone,
     id integer NOT NULL,
-    house_id integer
+    house_id integer,
+    zoo_id integer,
+    domain_id integer
 );
 
 
@@ -373,7 +370,6 @@ CREATE TABLE zoo.feedback (
     review_comment text,
     reviewed_at timestamp with time zone,
     reviewed_by character varying(100),
-    enclosure_id integer,
     value_time time without time zone,
     value_latitude double precision,
     value_longitude double precision,
@@ -385,7 +381,8 @@ CREATE TABLE zoo.feedback (
     value_report_reason_id smallint,
     value_language character varying(10),
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT feedback_status_check CHECK (((status IS NULL) OR ((status)::text = ANY ((ARRAY['pending'::character varying, 'accepted'::character varying, 'rejected'::character varying])::text[]))))
+    enclosure_species_id integer,
+    CONSTRAINT feedback_status_check CHECK (((status IS NULL) OR ((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('accepted'::character varying)::text, ('rejected'::character varying)::text]))))
 );
 
 
@@ -475,11 +472,12 @@ CREATE TABLE zoo.feedback_types (
 
 CREATE TABLE zoo.feeding_times (
     id integer NOT NULL,
-    enclosure_species_id integer,
+    species_id integer,
     feeding_time time without time zone NOT NULL,
     day_of_week smallint,
     note text,
-    is_public boolean DEFAULT true
+    is_public boolean DEFAULT true,
+    enclosure_species_id integer
 );
 
 
@@ -545,7 +543,7 @@ ALTER SEQUENCE zoo.geo_points_id_seq OWNED BY zoo.geo_points.id;
 CREATE TABLE zoo.house_opening_hours (
     id integer NOT NULL,
     house_id integer NOT NULL,
-    day_of_week character varying(20) NOT NULL,
+    day_of_week character varying(20),
     open_time time without time zone,
     close_time time without time zone,
     valid_from date,
@@ -777,7 +775,8 @@ CREATE TABLE zoo.media (
     entity_id integer,
     sort_order integer DEFAULT 0,
     label character varying(100),
-    wikidata_id character varying(20)
+    wikidata_id character varying(20),
+    new_icon_name character varying(300)
 );
 
 
@@ -808,7 +807,7 @@ ALTER SEQUENCE zoo.media_id_seq OWNED BY zoo.media.id;
 CREATE TABLE zoo.opening_hours (
     id integer NOT NULL,
     location_id integer NOT NULL,
-    day_of_week character varying(20) NOT NULL,
+    day_of_week character varying(20),
     open_time time without time zone,
     close_time time without time zone,
     valid_from date,
@@ -995,7 +994,7 @@ CREATE TABLE zoo.translations (
 CREATE TABLE zoo.zoo_opening_hours (
     id integer NOT NULL,
     zoo_id integer NOT NULL,
-    day_of_week character varying(20) NOT NULL,
+    day_of_week character varying(20),
     open_time time without time zone,
     close_time time without time zone,
     valid_from date,
@@ -1041,7 +1040,6 @@ CREATE TABLE zoo.zoos (
     bottom_right_longitude double precision,
     map_overlay character varying(100),
     data_version integer DEFAULT 0,
-    media_version integer DEFAULT 0 NOT NULL,
     is_active boolean DEFAULT true,
     easy_language boolean DEFAULT false,
     number_animals integer,
@@ -1052,7 +1050,14 @@ CREATE TABLE zoo.zoos (
     longitude double precision,
     time_open time without time zone,
     time_close time without time zone,
-    archived_at timestamp with time zone
+    archived_at timestamp with time zone,
+    media_version integer DEFAULT 0,
+    map_overlay_1_id integer,
+    map_overlay_2_id integer,
+    map_overlay_3_id integer,
+    map_overlay_4_id integer,
+    map_overlay_5_id integer,
+    icon_media_id integer
 );
 
 
@@ -1321,7 +1326,7 @@ ALTER TABLE ONLY zoo.domains
 --
 
 ALTER TABLE ONLY zoo.enclosure_species
-    ADD CONSTRAINT enclosure_species_pkey PRIMARY KEY (enclosure_id, species_id);
+    ADD CONSTRAINT enclosure_species_pkey PRIMARY KEY (id);
 
 
 --
@@ -1634,6 +1639,13 @@ CREATE UNIQUE INDEX idx_domains_zoo_name ON zoo.domains USING btree (zoo_id, nam
 
 
 --
+-- Name: idx_enclosures_image_media; Type: INDEX; Schema: zoo; Owner: -
+--
+
+CREATE INDEX idx_enclosures_image_media ON zoo.enclosures USING btree (image_media_id) WHERE (image_media_id IS NOT NULL);
+
+
+--
 -- Name: idx_enclosures_zoo_id; Type: INDEX; Schema: zoo; Owner: -
 --
 
@@ -1652,13 +1664,6 @@ CREATE INDEX idx_feedback_contributor ON zoo.feedback USING btree (contributor_i
 --
 
 CREATE INDEX idx_feedback_created_at ON zoo.feedback USING btree (created_at DESC);
-
-
---
--- Name: idx_feedback_enclosure; Type: INDEX; Schema: zoo; Owner: -
---
-
-CREATE INDEX idx_feedback_enclosure ON zoo.feedback USING btree (enclosure_id) WHERE (enclosure_id IS NOT NULL);
 
 
 --
@@ -1694,6 +1699,27 @@ CREATE INDEX idx_geo_points_entity ON zoo.geo_points USING btree (entity_type, e
 --
 
 CREATE UNIQUE INDEX idx_house_opening_hours_unique ON zoo.house_opening_hours USING btree (house_id, day_of_week);
+
+
+--
+-- Name: idx_houses_image_media; Type: INDEX; Schema: zoo; Owner: -
+--
+
+CREATE INDEX idx_houses_image_media ON zoo.houses USING btree (image_media_id) WHERE (image_media_id IS NOT NULL);
+
+
+--
+-- Name: idx_locations_icon_media; Type: INDEX; Schema: zoo; Owner: -
+--
+
+CREATE INDEX idx_locations_icon_media ON zoo.locations USING btree (icon_media_id) WHERE (icon_media_id IS NOT NULL);
+
+
+--
+-- Name: idx_locations_image_media; Type: INDEX; Schema: zoo; Owner: -
+--
+
+CREATE INDEX idx_locations_image_media ON zoo.locations USING btree (image_media_id) WHERE (image_media_id IS NOT NULL);
 
 
 --
@@ -1739,6 +1765,13 @@ CREATE UNIQUE INDEX idx_opening_hours_unique ON zoo.opening_hours USING btree (l
 
 
 --
+-- Name: idx_species_icon_media; Type: INDEX; Schema: zoo; Owner: -
+--
+
+CREATE INDEX idx_species_icon_media ON zoo.species USING btree (icon_media_id) WHERE (icon_media_id IS NOT NULL);
+
+
+--
 -- Name: idx_species_latin_name; Type: INDEX; Schema: zoo; Owner: -
 --
 
@@ -1774,19 +1807,52 @@ CREATE UNIQUE INDEX idx_species_wikidata_id_unique ON zoo.species USING btree (w
 
 
 --
--- Name: change_proposals change_proposals_zoo_id_fkey; Type: FK CONSTRAINT; Schema: community; Owner: -
+-- Name: idx_zoos_icon_media; Type: INDEX; Schema: zoo; Owner: -
 --
 
-ALTER TABLE ONLY community.change_proposals
-    ADD CONSTRAINT change_proposals_zoo_id_fkey FOREIGN KEY (zoo_id) REFERENCES zoo.zoos(id) ON DELETE CASCADE;
+CREATE INDEX idx_zoos_icon_media ON zoo.zoos USING btree (icon_media_id) WHERE (icon_media_id IS NOT NULL);
 
 
 --
--- Name: device_subscriptions device_subscriptions_zoo_id_fkey; Type: FK CONSTRAINT; Schema: community; Owner: -
+-- Name: idx_zoos_map_overlay_1_media; Type: INDEX; Schema: zoo; Owner: -
 --
 
-ALTER TABLE ONLY community.device_subscriptions
-    ADD CONSTRAINT device_subscriptions_zoo_id_fkey FOREIGN KEY (zoo_id) REFERENCES zoo.zoos(id) ON DELETE CASCADE;
+CREATE INDEX idx_zoos_map_overlay_1_media ON zoo.zoos USING btree (map_overlay_1_id) WHERE (map_overlay_1_id IS NOT NULL);
+
+
+--
+-- Name: idx_zoos_map_overlay_2_media; Type: INDEX; Schema: zoo; Owner: -
+--
+
+CREATE INDEX idx_zoos_map_overlay_2_media ON zoo.zoos USING btree (map_overlay_2_id) WHERE (map_overlay_2_id IS NOT NULL);
+
+
+--
+-- Name: idx_zoos_map_overlay_3_media; Type: INDEX; Schema: zoo; Owner: -
+--
+
+CREATE INDEX idx_zoos_map_overlay_3_media ON zoo.zoos USING btree (map_overlay_3_id) WHERE (map_overlay_3_id IS NOT NULL);
+
+
+--
+-- Name: idx_zoos_map_overlay_4_media; Type: INDEX; Schema: zoo; Owner: -
+--
+
+CREATE INDEX idx_zoos_map_overlay_4_media ON zoo.zoos USING btree (map_overlay_4_id) WHERE (map_overlay_4_id IS NOT NULL);
+
+
+--
+-- Name: idx_zoos_map_overlay_5_media; Type: INDEX; Schema: zoo; Owner: -
+--
+
+CREATE INDEX idx_zoos_map_overlay_5_media ON zoo.zoos USING btree (map_overlay_5_id) WHERE (map_overlay_5_id IS NOT NULL);
+
+
+--
+-- Name: uq_geo_points_entity; Type: INDEX; Schema: zoo; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_geo_points_entity ON zoo.geo_points USING btree (entity_type, entity_id);
 
 
 --
@@ -1806,15 +1872,7 @@ ALTER TABLE ONLY community.release_items
 
 
 --
--- Name: releases releases_zoo_id_fkey; Type: FK CONSTRAINT; Schema: community; Owner: -
---
-
-ALTER TABLE ONLY community.releases
-    ADD CONSTRAINT releases_zoo_id_fkey FOREIGN KEY (zoo_id) REFERENCES zoo.zoos(id) ON DELETE CASCADE;
-
-
---
--- Name: births births_enclosure_id_fkey; Type: FK CONSTRAINT; Schema: zoo; Owner: -
+-- Name: births births_enclosure_species_id_fkey; Type: FK CONSTRAINT; Schema: zoo; Owner: -
 --
 
 ALTER TABLE ONLY zoo.births
@@ -1846,14 +1904,19 @@ ALTER TABLE ONLY zoo.domains
 
 
 --
+-- Name: enclosure_species enclosure_species_domain_id_fkey; Type: FK CONSTRAINT; Schema: zoo; Owner: -
+--
+
+ALTER TABLE ONLY zoo.enclosure_species
+    ADD CONSTRAINT enclosure_species_domain_id_fkey FOREIGN KEY (domain_id) REFERENCES zoo.domains(id) ON DELETE SET NULL;
+
+
+--
 -- Name: enclosure_species enclosure_species_enclosure_id_fkey; Type: FK CONSTRAINT; Schema: zoo; Owner: -
 --
 
 ALTER TABLE ONLY zoo.enclosure_species
     ADD CONSTRAINT enclosure_species_enclosure_id_fkey FOREIGN KEY (enclosure_id) REFERENCES zoo.enclosures(id) ON DELETE CASCADE;
-
-ALTER TABLE ONLY zoo.enclosure_species
-    ADD CONSTRAINT enclosure_species_house_id_fkey FOREIGN KEY (house_id) REFERENCES zoo.houses(id) ON DELETE SET NULL;
 
 
 --
@@ -1862,6 +1925,14 @@ ALTER TABLE ONLY zoo.enclosure_species
 
 ALTER TABLE ONLY zoo.enclosure_species
     ADD CONSTRAINT enclosure_species_species_id_fkey FOREIGN KEY (species_id) REFERENCES zoo.species(id) ON DELETE CASCADE;
+
+
+--
+-- Name: enclosure_species enclosure_species_zoo_id_fkey; Type: FK CONSTRAINT; Schema: zoo; Owner: -
+--
+
+ALTER TABLE ONLY zoo.enclosure_species
+    ADD CONSTRAINT enclosure_species_zoo_id_fkey FOREIGN KEY (zoo_id) REFERENCES zoo.zoos(id) ON DELETE CASCADE;
 
 
 --
@@ -1881,6 +1952,14 @@ ALTER TABLE ONLY zoo.enclosures
 
 
 --
+-- Name: enclosures enclosures_image_media_id_fkey; Type: FK CONSTRAINT; Schema: zoo; Owner: -
+--
+
+ALTER TABLE ONLY zoo.enclosures
+    ADD CONSTRAINT enclosures_image_media_id_fkey FOREIGN KEY (image_media_id) REFERENCES zoo.media(id) ON DELETE SET NULL;
+
+
+--
 -- Name: enclosures enclosures_zoo_id_fkey; Type: FK CONSTRAINT; Schema: zoo; Owner: -
 --
 
@@ -1889,11 +1968,11 @@ ALTER TABLE ONLY zoo.enclosures
 
 
 --
--- Name: feedback feedback_enclosure_id_fkey; Type: FK CONSTRAINT; Schema: zoo; Owner: -
+-- Name: feedback feedback_enclosure_species_id_fkey; Type: FK CONSTRAINT; Schema: zoo; Owner: -
 --
 
 ALTER TABLE ONLY zoo.feedback
-    ADD CONSTRAINT feedback_enclosure_id_fkey FOREIGN KEY (enclosure_id) REFERENCES zoo.enclosures(id) ON DELETE SET NULL;
+    ADD CONSTRAINT feedback_enclosure_species_id_fkey FOREIGN KEY (enclosure_species_id) REFERENCES zoo.enclosure_species(id) ON DELETE SET NULL;
 
 
 --
@@ -1937,7 +2016,7 @@ ALTER TABLE ONLY zoo.feedback
 
 
 --
--- Name: feeding_times feeding_times_enclosure_id_fkey; Type: FK CONSTRAINT; Schema: zoo; Owner: -
+-- Name: feeding_times feeding_times_enclosure_species_id_fkey; Type: FK CONSTRAINT; Schema: zoo; Owner: -
 --
 
 ALTER TABLE ONLY zoo.feeding_times
@@ -1961,14 +2040,19 @@ ALTER TABLE ONLY zoo.house_opening_hours
 
 
 --
+-- Name: houses houses_image_media_id_fkey; Type: FK CONSTRAINT; Schema: zoo; Owner: -
+--
+
+ALTER TABLE ONLY zoo.houses
+    ADD CONSTRAINT houses_image_media_id_fkey FOREIGN KEY (image_media_id) REFERENCES zoo.media(id) ON DELETE SET NULL;
+
+
+--
 -- Name: houses houses_zoo_id_fkey; Type: FK CONSTRAINT; Schema: zoo; Owner: -
 --
 
 ALTER TABLE ONLY zoo.houses
     ADD CONSTRAINT houses_zoo_id_fkey FOREIGN KEY (zoo_id) REFERENCES zoo.zoos(id) ON DELETE CASCADE;
-
-ALTER TABLE ONLY zoo.houses
-    ADD CONSTRAINT houses_domain_id_fkey FOREIGN KEY (domain_id) REFERENCES zoo.domains(id) ON DELETE SET NULL;
 
 
 --
@@ -1988,11 +2072,35 @@ ALTER TABLE ONLY zoo.location_species
 
 
 --
+-- Name: location_types location_types_icon_media_id_fkey; Type: FK CONSTRAINT; Schema: zoo; Owner: -
+--
+
+ALTER TABLE ONLY zoo.location_types
+    ADD CONSTRAINT location_types_icon_media_id_fkey FOREIGN KEY (icon_media_id) REFERENCES zoo.media(id) ON DELETE SET NULL;
+
+
+--
 -- Name: locations locations_domain_id_fkey; Type: FK CONSTRAINT; Schema: zoo; Owner: -
 --
 
 ALTER TABLE ONLY zoo.locations
     ADD CONSTRAINT locations_domain_id_fkey FOREIGN KEY (domain_id) REFERENCES zoo.domains(id) ON DELETE SET NULL;
+
+
+--
+-- Name: locations locations_icon_media_id_fkey; Type: FK CONSTRAINT; Schema: zoo; Owner: -
+--
+
+ALTER TABLE ONLY zoo.locations
+    ADD CONSTRAINT locations_icon_media_id_fkey FOREIGN KEY (icon_media_id) REFERENCES zoo.media(id) ON DELETE SET NULL;
+
+
+--
+-- Name: locations locations_image_media_id_fkey; Type: FK CONSTRAINT; Schema: zoo; Owner: -
+--
+
+ALTER TABLE ONLY zoo.locations
+    ADD CONSTRAINT locations_image_media_id_fkey FOREIGN KEY (image_media_id) REFERENCES zoo.media(id) ON DELETE SET NULL;
 
 
 --
@@ -2028,6 +2136,14 @@ ALTER TABLE ONLY zoo.opening_hours
 
 
 --
+-- Name: species species_icon_media_id_fkey; Type: FK CONSTRAINT; Schema: zoo; Owner: -
+--
+
+ALTER TABLE ONLY zoo.species
+    ADD CONSTRAINT species_icon_media_id_fkey FOREIGN KEY (icon_media_id) REFERENCES zoo.media(id) ON DELETE SET NULL;
+
+
+--
 -- Name: species_texts species_texts_species_id_fkey; Type: FK CONSTRAINT; Schema: zoo; Owner: -
 --
 
@@ -2043,97 +2159,57 @@ ALTER TABLE ONLY zoo.zoo_opening_hours
     ADD CONSTRAINT zoo_opening_hours_zoo_id_fkey FOREIGN KEY (zoo_id) REFERENCES zoo.zoos(id) ON DELETE CASCADE;
 
 
--- ============================================================================
--- Seed-Daten: Pflichteinträge für den Betrieb
--- ============================================================================
+--
+-- Name: zoos zoos_icon_media_id_fkey; Type: FK CONSTRAINT; Schema: zoo; Owner: -
+--
 
--- ── Feedback-Typen ───────────────────────────────────────────────────────────
+ALTER TABLE ONLY zoo.zoos
+    ADD CONSTRAINT zoos_icon_media_id_fkey FOREIGN KEY (icon_media_id) REFERENCES zoo.media(id) ON DELETE SET NULL;
 
-INSERT INTO zoo.feedback_types
-    (id, slug, label_de, entity_type, requires_admin_review, is_active)
-VALUES
-    (1,  'feeding_time',         'Fütterungszeit melden',          'enclosure', TRUE,  TRUE),
-    (2,  'position',             'Position korrigieren',           'enclosure', TRUE,  TRUE),
-    (3,  'new_species_wikidata', 'Neues Tier (Wikidata)',           'enclosure', TRUE,  TRUE),
-    (4,  'species_missing',      'Tier nicht mehr vorhanden',      'enclosure', TRUE,  TRUE),
-    (5,  'enclosure_name',       'Gehegename korrigieren',         'enclosure', TRUE,  TRUE),
-    (6,  'zoo_info',             'Zoo-Information korrigieren',    'zoo',       TRUE,  TRUE),
-    (7,  'opening_hours',        'Öffnungszeiten korrigieren',     'zoo',       TRUE,  TRUE),
-    (8,  'report',               'Inhalt melden',                  'enclosure', TRUE,  TRUE),
-    (9,  'text_helpful',         'Text hilfreich',                 'species',   FALSE, TRUE),
-    (10, 'text_not_helpful',     'Text nicht hilfreich',           'species',   FALSE, TRUE)
-ON CONFLICT (id) DO NOTHING;
 
-SELECT setval(
-    pg_get_serial_sequence('zoo.feedback_types', 'id'),
-    GREATEST((SELECT MAX(id) FROM zoo.feedback_types), 10)
-);
+--
+-- Name: zoos zoos_map_overlay_1_id_fkey; Type: FK CONSTRAINT; Schema: zoo; Owner: -
+--
 
--- ── Feedback-Report-Reasons (für Typ 8 "report") ─────────────────────────────
+ALTER TABLE ONLY zoo.zoos
+    ADD CONSTRAINT zoos_map_overlay_1_id_fkey FOREIGN KEY (map_overlay_1_id) REFERENCES zoo.media(id) ON DELETE SET NULL;
 
-INSERT INTO zoo.feedback_report_reasons
-    (id, slug, label_de)
-VALUES
-    (1, 'incorrect_info', 'Falsche Information'),
-    (2, 'offensive',      'Anstößiger Inhalt'),
-    (3, 'outdated',       'Veraltete Information'),
-    (4, 'other',          'Sonstiges')
-ON CONFLICT (id) DO NOTHING;
 
-SELECT setval(
-    pg_get_serial_sequence('zoo.feedback_report_reasons', 'id'),
-    GREATEST((SELECT MAX(id) FROM zoo.feedback_report_reasons), 4)
-);
+--
+-- Name: zoos zoos_map_overlay_2_id_fkey; Type: FK CONSTRAINT; Schema: zoo; Owner: -
+--
+
+ALTER TABLE ONLY zoo.zoos
+    ADD CONSTRAINT zoos_map_overlay_2_id_fkey FOREIGN KEY (map_overlay_2_id) REFERENCES zoo.media(id) ON DELETE SET NULL;
+
+
+--
+-- Name: zoos zoos_map_overlay_3_id_fkey; Type: FK CONSTRAINT; Schema: zoo; Owner: -
+--
+
+ALTER TABLE ONLY zoo.zoos
+    ADD CONSTRAINT zoos_map_overlay_3_id_fkey FOREIGN KEY (map_overlay_3_id) REFERENCES zoo.media(id) ON DELETE SET NULL;
+
+
+--
+-- Name: zoos zoos_map_overlay_4_id_fkey; Type: FK CONSTRAINT; Schema: zoo; Owner: -
+--
+
+ALTER TABLE ONLY zoo.zoos
+    ADD CONSTRAINT zoos_map_overlay_4_id_fkey FOREIGN KEY (map_overlay_4_id) REFERENCES zoo.media(id) ON DELETE SET NULL;
+
+
+--
+-- Name: zoos zoos_map_overlay_5_id_fkey; Type: FK CONSTRAINT; Schema: zoo; Owner: -
+--
+
+ALTER TABLE ONLY zoo.zoos
+    ADD CONSTRAINT zoos_map_overlay_5_id_fkey FOREIGN KEY (map_overlay_5_id) REFERENCES zoo.media(id) ON DELETE SET NULL;
+
 
 --
 -- PostgreSQL database dump complete
 --
 
---
--- Data for location_types
---
+\unrestrict IgqNeTZRhgkGviizlzhIQ1H2a5tMYifuU7rXNcmpA4yDUxy7GY0XzrvFClIwEjg
 
-INSERT INTO zoo.location_types (slug, name, icon, sort_order) VALUES
-  ('wc',                  'WC',                   'restroom',       1),
-  ('wickelraum',          'Wickelraum',            'baby-carriage',  2),
-  ('spielplatz',          'Spielplatz',            'playground',     3),
-  ('restaurant',          'Restaurant',            'fork-knife',     4),
-  ('kiosk',               'Kiosk',                 'coffee',         5),
-  ('eis',                 'Eis',                   'ice-cream',      6),
-  ('shop',                'Shop',                  'shopping-bag',   7),
-  ('eingang',             'Eingang',               'door-enter',     8),
-  ('ausgang',             'Ausgang',               'door-exit',      9),
-  ('backstube',           'Backstube',             'bread',          10),
-  ('museum',              'Museum',                'building',       11),
-  ('attraktion',          'Attraktion',            'star',           12),
-  ('service',             'Service',               'tool',           13),
-  ('aussichtsplattform',  'Aussichtsplattform',    'binoculars',     15),
-  ('behindertentoilette', 'Behindertentoilette',   'accessible',     3),
-  ('sonstiges',           'Sonstiges',             'dots',           99);
-
-CREATE UNIQUE INDEX uq_geo_points_entity ON zoo.geo_points (entity_type, entity_id);
-
--- Media FK constraints (migration Juni 2026)
-ALTER TABLE ONLY zoo.species
-    ADD CONSTRAINT species_icon_media_id_fkey FOREIGN KEY (icon_media_id) REFERENCES zoo.media(id) ON DELETE SET NULL;
-
-ALTER TABLE ONLY zoo.location_types
-    ADD CONSTRAINT location_types_icon_media_id_fkey FOREIGN KEY (icon_media_id) REFERENCES zoo.media(id) ON DELETE SET NULL;
-
-ALTER TABLE ONLY zoo.locations
-    ADD CONSTRAINT locations_icon_media_id_fkey FOREIGN KEY (icon_media_id) REFERENCES zoo.media(id) ON DELETE SET NULL;
-
-ALTER TABLE ONLY zoo.locations
-    ADD CONSTRAINT locations_image_media_id_fkey FOREIGN KEY (image_media_id) REFERENCES zoo.media(id) ON DELETE SET NULL;
-
-ALTER TABLE ONLY zoo.enclosures
-    ADD CONSTRAINT enclosures_image_media_id_fkey FOREIGN KEY (image_media_id) REFERENCES zoo.media(id) ON DELETE SET NULL;
-
-ALTER TABLE ONLY zoo.houses
-    ADD CONSTRAINT houses_image_media_id_fkey FOREIGN KEY (image_media_id) REFERENCES zoo.media(id) ON DELETE SET NULL;
-
-CREATE INDEX idx_species_icon_media ON zoo.species (icon_media_id) WHERE icon_media_id IS NOT NULL;
-CREATE INDEX idx_locations_icon_media ON zoo.locations (icon_media_id) WHERE icon_media_id IS NOT NULL;
-CREATE INDEX idx_locations_image_media ON zoo.locations (image_media_id) WHERE image_media_id IS NOT NULL;
-CREATE INDEX idx_enclosures_image_media ON zoo.enclosures (image_media_id) WHERE image_media_id IS NOT NULL;
-CREATE INDEX idx_houses_image_media ON zoo.houses (image_media_id) WHERE image_media_id IS NOT NULL;
