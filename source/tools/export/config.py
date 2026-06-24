@@ -37,4 +37,6 @@ PG_CONFIG = {
     "options":  "-c search_path=zoo,public",
 }
 
-OUTPUT_DIR = Path.home() / "sqlite"
+OUTPUT_DIR  = Path.home() / "sqlite"
+STORAGE_DIR = env.get("STORAGE_DIR",
+                       str(Path(__file__).parent.parent.parent.parent / "media"))

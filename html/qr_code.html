@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenZooData QR-Codes</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        margin: 2rem;
+        text-align: center;
+    }
+
+    h1 { margin-bottom: 0.5rem; }
+    .subtitle { margin-bottom: 2rem; color: #666; }
+
+    #grid {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        align-items: flex-start;
+        gap: 2rem;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    .zoo {
+        text-align: center;
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        padding: 1rem;
+        width: 260px;
+        background: #fafafa;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+    }
+
+    .zoo p {
+        margin: 0.75rem 0 0.25rem;
+        font-weight: bold;
+        font-size: 1.1rem;
+    }
+
+    .zoo small {
+        color: #666;
+        display: block;
+        margin-bottom: 0.75rem;
+    }
+
+    .feed-link {
+        display: block;
+        margin-top: 0.75rem;
+        font-size: 0.8rem;
+        word-break: break-all;
+    }
+
+    .download-btn {
+        display: inline-block;
+        margin-top: 0.75rem;
+        padding: 0.5rem 1rem;
+        border-radius: 5px;
+        background: #1976d2;
+        color: white;
+        text-decoration: none;
+        cursor: pointer;
+    }
+
+    #error {
+        color: #b00020;
+        margin-top: 2rem;
+        font-weight: bold;
+    }
+</style>
+</head>
+<body>
+
+<h1>OpenZooData QR-Codes</h1>
+
+<div class="subtitle">
+Scanne einen QR-Code mit der ZooGuide-App, um einen Zoo zu abonnieren.
+</div>
+
+<div id="grid"></div>
+<div id="error"></div>
+
+<script>
+const API_BASE = 'https://api.openzoodata.org';
+
+async function loadZoos() {
+    const grid = document.getElementById('grid');
+    const errorEl = document.getElementById('error');
+
+    grid.innerHTML = '';
+    errorEl.textContent = '';
+
+    try {
+        const resp = await fetch(`${API_BASE}/feed`);
+
+        if (!resp.ok) {
+            throw new Error(`HTTP ${resp.status}`);
+        }
+
+        const zoos = await resp.json();
+
+        for (const zoo of zoos) {
+            const card = document.createElement('div');
+            card.className = 'zoo';
+
+            const qrDiv = document.createElement('div');
+            card.appendChild(qrDiv);
+
+            new QRCode(qrDiv, {
+                text: zoo.feed_url,
+                width: 200,
+                height: 200
+            });
+
+            const title = document.createElement('p');
+            title.textContent = zoo.name;
+            card.appendChild(title);
+
+            const version = document.createElement('small');
+            version.textContent = `Version ${zoo.version}`;
+            card.appendChild(version);
+
+            const button = document.createElement('button');
+            button.className = 'download-btn';
+            button.textContent = 'QR-Code herunterladen';
+
+            button.onclick = () => {
+                const img = qrDiv.querySelector('img');
+                if (!img) return;
+
+                const a = document.createElement('a');
+                a.href = img.src;
+                a.download = `${zoo.slug}.png`;
+                a.click();
+            };
+
+            card.appendChild(button);
+            grid.appendChild(card);
+        }
+
+    } catch (err) {
+        errorEl.textContent = `Konnte Feed nicht laden: ${err.message}`;
+    }
+}
+
+loadZoos();
+</script>
+
+</body>
+</html>

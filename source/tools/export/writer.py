@@ -10,8 +10,10 @@ import os
 import shutil
 import sqlite3
 import tempfile
+import zipfile
 from pathlib import Path
 
+from .config import PG_CONFIG, OUTPUT_DIR, STORAGE_DIR
 from .schema import SCHEMA
 from .fetch import (
     fetch_zoo, fetch_zoo_opening_hours, fetch_domains, fetch_location_types,
@@ -46,7 +48,7 @@ def _do_export(pg, zoo_id: int, slug: str, output_path: Path):
         db = sqlite3.connect(str(tmp_sqlite))
         db.executescript(SCHEMA)
 
-        print("   Lade Daten aus PostgreSQL...")
+        print(f"   Lade Daten aus PostgreSQL...")
         zoo_row           = fetch_zoo(pg, zoo_id)
         zoo_opening_hrs   = fetch_zoo_opening_hours(pg, zoo_id)
         domains           = fetch_domains(pg, zoo_id)
@@ -70,7 +72,7 @@ def _do_export(pg, zoo_id: int, slug: str, output_path: Path):
         media             = fetch_media(pg, zoo_id)
         pg.commit()  # read-Transaktion beenden
 
-        print("   Schreibe SQLite...")
+        print(f"   Schreibe SQLite...")
         db.execute(
             "INSERT OR REPLACE INTO zoos VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             zoo_row
@@ -104,7 +106,7 @@ def _do_export(pg, zoo_id: int, slug: str, output_path: Path):
 
         # Statistik
         db = sqlite3.connect(str(tmp_sqlite))
-        print("   Statistik:")
+        print(f"   Statistik:")
         for table in STATS_TABLES:
             count = db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
             if count > 0:
@@ -121,6 +123,92 @@ def _do_export(pg, zoo_id: int, slug: str, output_path: Path):
             tmp_sqlite.unlink()
 
 
+def build_media_bundle(pg, zoo_id: int, slug: str,
+                       output_dir: Path, media_version: int) -> Path:
+    """
+    Baut das Media-Bundle als ZIP und schreibt es nach output_dir.
+    Dateiname: <slug>_media_v<media_version>.zip
+    ZIP-Struktur: <slug>_media/<entity_type>/<filename>
+    Gleiche Struktur wie der bisherige GET /media-bundle/<zoo>-Endpoint.
+    Alte Bundle-Dateien desselben Zoos werden nach erfolgreichem Schreiben
+    gelöscht (nur die aktuelle Version bleibt).
+    """
+    bundle_filename = f"{slug}_media_v{media_version}.zip"
+    final_path      = output_dir / bundle_filename
+    tmp_path        = output_dir / f".tmp_bundle_{slug}_{os.getpid()}.zip"
+    prefix          = f"{slug}_media"
+    storage_dir     = Path(STORAGE_DIR)
+
+    try:
+        with pg.cursor() as cur:
+            # 1) Zoo-spezifische Media-Einträge
+            cur.execute("""
+                SELECT storage_path, entity_type, filename
+                FROM zoo.media
+                WHERE zoo_id = %s
+                ORDER BY entity_type, filename
+            """, (zoo_id,))
+            zoo_media = cur.fetchall()
+
+            # 2) Species-Bilder die in diesem Zoo vorkommen
+            cur.execute("""
+                SELECT DISTINCT m.storage_path, m.entity_type, m.filename
+                FROM zoo.media m
+                JOIN zoo.species s ON s.id = m.entity_id
+                    AND m.entity_type = 'species'
+                JOIN zoo.enclosure_species es ON es.species_id = s.id
+                WHERE es.zoo_id = %s
+                ORDER BY m.filename
+            """, (zoo_id,))
+            species_media = cur.fetchall()
+
+        media_rows = list(zoo_media) + list(species_media)
+        added = set()
+        missing = 0
+
+        with zipfile.ZipFile(str(tmp_path), mode="w",
+                             compression=zipfile.ZIP_DEFLATED) as zf:
+            for storage_path, entity_type, filename in media_rows:
+                arcname = f"{prefix}/{entity_type}/{filename}"
+                if arcname in added:
+                    continue
+                added.add(arcname)
+
+                full_path = storage_dir / storage_path / filename
+                if not full_path.is_file():
+                    logging.warning(f"Media bundle: Datei nicht gefunden: {full_path}")
+                    missing += 1
+                    continue
+
+                zf.write(str(full_path), arcname=arcname)
+
+        if not tmp_path.is_file() or tmp_path.stat().st_size < 22:
+            raise RuntimeError("Media-Bundle leer oder fehlgeschlagen")
+
+        os.replace(tmp_path, final_path)
+
+        # Alte Bundle-Versionen desselben Zoos aufräumen
+        for old in output_dir.glob(f"{slug}_media_v*.zip"):
+            if old != final_path:
+                try:
+                    old.unlink()
+                    logging.info(f"Altes Bundle gelöscht: {old.name}")
+                except OSError:
+                    pass
+
+        total = len(added)
+        logging.info(f"Media-Bundle {slug} OK: {bundle_filename} "
+                     f"({total} Dateien, {missing} fehlend, "
+                     f"{final_path.stat().st_size / 1024:.1f} KB)")
+        return final_path
+
+    except Exception as e:
+        if tmp_path.exists():
+            tmp_path.unlink()
+        logging.error(f"Media-Bundle {slug} fehlgeschlagen: {e}")
+        raise
+
+
 def export_zoo(pg, zoo_id: int, slug: str, output_dir: Path) -> Path:
     final_path = output_dir / f"{slug}.sqlite.gz"
 
@@ -133,11 +221,6 @@ def export_zoo(pg, zoo_id: int, slug: str, output_dir: Path) -> Path:
         tmp_path = Path(tmp_file.name)
 
     try:
-        # Migration v7: data_version wird NICHT mehr hier erhöht.
-        # Das Increment erfolgt ausschließlich in routes/publish.py
-        # nach erfolgreichem Export — verhindert doppeltes Increment.
-        # Funktion _increment_data_version() bleibt als Fallback erhalten
-        # aber wird nicht mehr automatisch aufgerufen.
         _do_export(pg, zoo_id, slug, tmp_path)
 
         if not tmp_path.is_file():
@@ -154,5 +237,16 @@ def export_zoo(pg, zoo_id: int, slug: str, output_dir: Path) -> Path:
             tmp_path.unlink()
         logging.error(f"Export {slug} fehlgeschlagen: {e}")
         raise
+
+    # Media-Bundle nach erfolgreichem SQLite-Export bauen
+    try:
+        with pg.cursor() as cur:
+            cur.execute("SELECT media_version FROM zoo.zoos WHERE id = %s", (zoo_id,))
+            row = cur.fetchone()
+            media_version = row[0] if row else 0
+        build_media_bundle(pg, zoo_id, slug, output_dir, media_version)
+    except Exception:
+        # Media-Bundle-Fehler darf den SQLite-Export nicht rückgängig machen
+        logging.exception(f"Media-Bundle {slug} fehlgeschlagen (SQLite-Export bleibt)")
 
     return final_path
