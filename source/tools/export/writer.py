@@ -95,7 +95,7 @@ def _do_export(pg, zoo_id: int, slug: str, output_path: Path):
         db.executemany("INSERT OR REPLACE INTO opening_hours VALUES (?,?,?,?,?,?,?,?)", opening_hrs)
         db.executemany("INSERT OR REPLACE INTO species VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)", species)
         db.executemany("INSERT OR REPLACE INTO species_texts VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", species_texts)
-        db.executemany("INSERT OR REPLACE INTO enclosure_species VALUES (?,?,?,?,?,?,?)", enc_species)
+        db.executemany("INSERT OR REPLACE INTO enclosure_species VALUES (?,?,?,?,?,?,?,?,?,?,?)", enc_species)
         db.executemany("INSERT OR REPLACE INTO feeding_times VALUES (?,?,?,?,?,?,?)", feeding_times)
         db.executemany("INSERT OR REPLACE INTO births VALUES (?,?,?,?,?,?,?,?,?)", births)
         db.executemany("INSERT OR REPLACE INTO geo_points VALUES (?,?,?,?,?,?,?)", geo_points)
