@@ -93,10 +93,9 @@ def fetch_species(pg, zoo_id: int) -> List[tuple]:
                    s.tax_order_id, s.tax_family_id, s.tax_genus_id,
                    s.iucn_status_id, s.iucn_population_trend_id,
                    s.gbif_taxon_key, s.id_valid
-            FROM species s
-            JOIN enclosure_species es ON es.species_id = s.id
-            JOIN enclosures e ON e.id = es.enclosure_id
-            WHERE e.zoo_id = %s
+            FROM zoo.species s
+            JOIN zoo.enclosure_species es ON es.species_id = s.id
+            WHERE es.zoo_id = %s
         """, (zoo_id,))
         return cur.fetchall()
 
@@ -113,8 +112,7 @@ def fetch_species_texts(pg, zoo_id: int) -> List[tuple]:
             WHERE st.species_id IN (
                 SELECT DISTINCT es.species_id
                 FROM zoo.enclosure_species es
-                JOIN zoo.enclosures e ON e.id = es.enclosure_id
-                WHERE e.zoo_id = %s
+                WHERE es.zoo_id = %s
             )
             AND st.de IS NOT NULL
         """, (zoo_id,))
@@ -136,10 +134,11 @@ def fetch_enclosures(pg, zoo_id: int) -> List[tuple]:
 def fetch_enclosure_species(pg, zoo_id: int) -> List[tuple]:
     with pg.cursor() as cur:
         cur.execute("""
-            SELECT es.id, es.enclosure_id, es.species_id, es.note,
+            SELECT es.id, es.zoo_id, es.enclosure_id, es.house_id,
+                   es.domain_id, es.species_id, es.note,
                    es.count_adult, es.count_juvenile,
-                   es.counted_at::TEXT
-            FROM enclosure_species es
+                   es.counted_at::TEXT, es.icon_media_id
+            FROM zoo.enclosure_species es
             WHERE es.zoo_id = %s
         """, (zoo_id,))
         return cur.fetchall()

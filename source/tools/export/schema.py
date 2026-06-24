@@ -179,13 +179,16 @@ CREATE TABLE IF NOT EXISTS species_texts (
 
 CREATE TABLE IF NOT EXISTS enclosure_species (
     id             INTEGER PRIMARY KEY,
+    zoo_id         INTEGER,
     enclosure_id   INTEGER,
+    house_id       INTEGER,
+    domain_id      INTEGER,
     species_id     INTEGER NOT NULL,
     note           TEXT,
     count_adult    INTEGER,
     count_juvenile INTEGER,
     counted_at     TEXT,
-    UNIQUE (enclosure_id, species_id)
+    icon_media_id  INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS feeding_times (
