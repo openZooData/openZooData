@@ -154,7 +154,8 @@ CREATE TABLE IF NOT EXISTS species (
     iucn_status_id           TEXT,
     iucn_population_trend_id TEXT,
     gbif_taxon_key           INTEGER,
-    id_valid                 INTEGER DEFAULT 0
+    id_valid                 INTEGER DEFAULT 0,
+    icon_media_id            INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS species_texts (
