@@ -92,7 +92,7 @@ def fetch_species(pg, zoo_id: int) -> List[tuple]:
                    s.tax_kingdom_id, s.tax_phylum_id, s.tax_class_id,
                    s.tax_order_id, s.tax_family_id, s.tax_genus_id,
                    s.iucn_status_id, s.iucn_population_trend_id,
-                   s.gbif_taxon_key, s.id_valid
+                   s.gbif_taxon_key, s.id_valid, s.icon_media_id
             FROM zoo.species s
             JOIN zoo.enclosure_species es ON es.species_id = s.id
             WHERE es.zoo_id = %s
