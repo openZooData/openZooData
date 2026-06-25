@@ -293,22 +293,21 @@ def fetch_media(pg, zoo_id: int) -> List[tuple]:
             SELECT DISTINCT m.id, m.entity_type, m.entity_id,
                    m.wikidata_id, m.filename, m.storage_path,
                    m.mime_type, m.sort_order, m.label
-            FROM media m
+            FROM zoo.media m
             WHERE (m.entity_type = 'zoo' AND m.entity_id = %s)
             OR (m.entity_type = 'species' AND m.entity_id IN (
-                SELECT DISTINCT s.id FROM species s
-                JOIN enclosure_species es ON es.species_id = s.id
-                JOIN enclosures e ON e.id = es.enclosure_id
-                WHERE e.zoo_id = %s))
+                SELECT DISTINCT es.species_id
+                FROM zoo.enclosure_species es
+                WHERE es.zoo_id = %s))
             OR (m.entity_type = 'location' AND m.entity_id IN (
-                SELECT id FROM locations WHERE zoo_id = %s))
+                SELECT id FROM zoo.locations WHERE zoo_id = %s))
             OR (m.entity_type = 'enclosure' AND m.entity_id IN (
-                SELECT id FROM enclosures WHERE zoo_id = %s))
+                SELECT id FROM zoo.enclosures WHERE zoo_id = %s))
             OR (m.entity_type = 'enclosure_species' AND m.entity_id IN (
-                SELECT es.id FROM enclosure_species es
-                JOIN enclosures e ON e.id = es.enclosure_id
-                WHERE e.zoo_id = %s))
-        """, (zoo_id, zoo_id, zoo_id, zoo_id, zoo_id))
+                SELECT id FROM zoo.enclosure_species WHERE zoo_id = %s))
+            OR (m.entity_type = 'house' AND m.entity_id IN (
+                SELECT id FROM zoo.houses WHERE zoo_id = %s))
+        """, (zoo_id, zoo_id, zoo_id, zoo_id, zoo_id, zoo_id))
         return cur.fetchall()
 
 
