@@ -180,10 +180,7 @@ sequenceDiagram
     Feed->>App: Offline-capable biodiversity dataset
 ```
 
-
-```
 ![OpenZooData Architecture](docs/architecture.md)
-```
 
 ---
 
@@ -225,6 +222,7 @@ If the screenshots are not available yet, keep this section and add the image fi
 ## Live Demo
 
 Example public endpoints:
+![OpenZooData Demo Zoo](www.openzoodata.org)
 
 ```text
 https://api.openzoodata.org/status
@@ -483,11 +481,8 @@ Example species data fields may include:
 }
 ```
 
-
-```text
 ![OpenZooData GBIF integration](docs/gbif.md)
 ![OpenZooData Wikidata integration](docs/wikidata.md)
-```
 
 ---
 
@@ -714,10 +709,8 @@ CONTRIBUTING.md
 Please do not report security vulnerabilities publicly.
 
 See:
-
-```text
 ![OpenZooData Federation Model](SECURITY.md)
-```
+
 
 Security contact:
 
@@ -737,10 +730,7 @@ thorsten@codelab.cafe
 | Name and logos | Trademark protected |
 
 See:
-
-```text
 ![OpenZooData License](DATA_LICENSE.md)
-```
 
 Note: species imagery may originate from Wikimedia Commons and can have individual licenses. Consumers should preserve and display image attribution where required.
 
