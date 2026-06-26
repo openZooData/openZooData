@@ -139,25 +139,20 @@ OpenZooData follows a federated architecture. Each zoo can operate its own serve
 flowchart TD
     staff[Zoo Staff] --> creator[ZooCreator / Admin Tools]
     creator --> server[OpenZooData Server]
-
     server --> api[REST API]
     server --> rss[RSS Discovery Feeds]
     server --> sqlite[SQLite Offline Bundles]
     server --> media[Media Store]
-
     server --> pg[(PostgreSQL)]
     server --> auth[(Auth Database)]
-
     server --> wd[Wikidata]
     server --> gbif[GBIF Backbone Taxonomy]
-
     api --> researchers[Researchers and Developers]
     rss --> aggregators[Aggregators]
     sqlite --> apps[Offline Mobile Apps]
     sqlite --> zooguide[ZooGuide]
-
-    wd --> graph[Global Biodiversity Knowledge Graph]
-    gbif --> graph
+    wd --> knowledge_graph[Global Biodiversity Knowledge Graph]
+    gbif --> knowledge_graph
 ```
 
 ### Data flow
@@ -180,9 +175,8 @@ sequenceDiagram
     Feed->>App: Offline-capable biodiversity dataset
 ```
 See:
-```markdown
 [OpenZooData Architecture](docs/architecture.md)
-```
+
 ---
 
 ## Screenshots
@@ -421,9 +415,7 @@ SQLite bundles are designed for offline mobile clients and can contain species, 
 | `/api/v1/admin/users` | Admin user management |
 
 See:
-```markdown
-[OpenZooData Architecture](docs/api.md)
-```
+[OpenZooData API](docs/api.md)
 
 ---
 
@@ -456,9 +448,7 @@ This model is deliberately close to how the open web works:
 - data remains reusable and machine-readable.
 
 See:
-```markdown
-[OpenZooData Architecture](docs/federation.md)
-```
+[OpenZooData Federation](docs/federation.md)
 
 ---
 
@@ -491,9 +481,7 @@ Example species data fields may include:
 }
 ```
 See:
-```markdown
 [OpenZooData GBIF integration](docs/gbif.md)
-```
 
 ---
 
@@ -569,9 +557,7 @@ openZooData/
 ### Setup
 
 See:
-```markdown
-[OpenZooData Architecture](docs/quickstart.md)
-```
+[OpenZooData Quickstart](docs/quickstart.md)
 
 ```bash
 cp tests/.env.example tests/.env
@@ -713,10 +699,7 @@ Useful contribution areas include:
 - sample datasets.
 
 See:
-
-```text
-CONTRIBUTING.md
-```
+[OpenZooData Contributing](CONTRIBUTING.md)
 
 ---
 
@@ -725,9 +708,7 @@ CONTRIBUTING.md
 Please do not report security vulnerabilities publicly.
 
 See:
-```markdown
-[OpenZooData Federation Model](SECURITY.md)
-```
+[OpenZooData Security](SECURITY.md)
 
 Security contact:
 
@@ -747,9 +728,7 @@ thorsten@codelab.cafe
 | Name and logos | Trademark protected |
 
 See:
-```markdown
-[OpenZooData Federation Model](DATA_LICENSE.md)
-```
+[OpenZooData License Model](DATA_LICENSE.md)
 
 Note: species imagery may originate from Wikimedia Commons and can have individual licenses. Consumers should preserve and display image attribution where required.
 
