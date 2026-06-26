@@ -15,14 +15,14 @@ from pathlib import Path
 
 from .config import PG_CONFIG, OUTPUT_DIR, STORAGE_DIR
 from .schema import SCHEMA
-from .fetch import (
-    fetch_zoo, fetch_zoo_opening_hours, fetch_domains, fetch_location_types,
+from .fetch import (    fetch_zoo, fetch_zoo_opening_hours, fetch_domains, fetch_location_types,
     fetch_taxonomy, fetch_iucn_status, fetch_iucn_trend, fetch_houses,
     fetch_house_opening_hours, fetch_enclosures, fetch_locations,
     fetch_location_species, fetch_opening_hours, fetch_species,
     fetch_species_texts, fetch_enclosure_species, fetch_feeding_times,
     fetch_births, fetch_geo_points, fetch_translations, fetch_media,
 )
+from helpers.taxonomy_sync import sync_missing_taxonomy
 
 STATS_TABLES = [
     'species', 'species_texts', 'enclosures', 'enclosure_species',
@@ -211,6 +211,10 @@ def build_media_bundle(pg, zoo_id: int, slug: str,
 
 def export_zoo(pg, zoo_id: int, slug: str, output_dir: Path) -> Path:
     final_path = output_dir / f"{slug}.sqlite.gz"
+
+    # Taxonomy-Sync: nur fehlende QIDs bei Wikidata abfragen
+    # Schlägt fehl → Warnung, Export läuft trotzdem weiter
+    sync_missing_taxonomy(pg)
 
     with tempfile.NamedTemporaryFile(
         dir=output_dir,

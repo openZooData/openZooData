@@ -19,7 +19,12 @@ app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
 app.config["MAX_CONTENT_LENGTH"] = 12 * 1024 * 1024
 limiter.init_app(app)
-logging.basicConfig(filename="flask-error.log", level=logging.WARNING)
+logging.basicConfig(
+    filename="flask-error.log",
+    level=logging.WARNING,
+    format="%(asctime)s %(levelname)s:%(name)s:%(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
 
 JWT_SECRET = os.getenv("JWT_SECRET")
 if not JWT_SECRET or len(JWT_SECRET) < 32:
@@ -127,6 +132,10 @@ def set_security_headers(resp):
     resp.headers.setdefault("X-Content-Type-Options", "nosniff")
     resp.headers.setdefault("X-Frame-Options", "DENY")
     resp.headers.setdefault("Referrer-Policy", "no-referrer")
+    # Werkzeug-Dev-Server verrät standardmäßig Framework+Python-Version
+    # im Server-Header (z.B. "Werkzeug/3.1.6 Python/3.11.15") — überschreiben,
+    # damit keine Fingerprinting-Infos nach außen gehen.
+    resp.headers["Server"] = "openZooData"
     return resp
 
 
@@ -145,6 +154,19 @@ def ratelimit_handler(e):
 
 
 if __name__ == "__main__":
+    from werkzeug.serving import WSGIRequestHandler
+
+    class _QuietRequestHandler(WSGIRequestHandler):
+        """
+        Werkzeug schreibt sonst "Werkzeug/x.x Python/x.x.x" in den Server-
+        Header (Framework-Fingerprinting). version_string() ist die Stelle,
+        an der dieser String tatsächlich erzeugt wird — hier überschreiben
+        statt im Nachhinein über response.headers zu versuchen, einen ggf.
+        von Werkzeug separat gesetzten Server-Header zu überschreiben.
+        """
+        def version_string(self):
+            return "openZooData"
+
     host = os.getenv("FLASK_HOST", "127.0.0.1")
     port = int(os.getenv("FLASK_PORT", "5001"))
-    app.run(host=host, port=port, debug=False)
+    app.run(host=host, port=port, debug=False, request_handler=_QuietRequestHandler)
