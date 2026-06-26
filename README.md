@@ -453,7 +453,6 @@ This model is deliberately close to how the open web works:
 - institutions are not forced into a single central platform,
 - data remains reusable and machine-readable.
 
-![OpenZooData Federation Model](docs/images/federation.svg)
 
 ---
 
