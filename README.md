@@ -179,9 +179,10 @@ sequenceDiagram
     Server->>Feed: Publish REST, RSS and SQLite data
     Feed->>App: Offline-capable biodiversity dataset
 ```
-
-![OpenZooData Architecture](docs/architecture.md)
-
+See:
+```markdown
+[OpenZooData Architecture](docs/architecture.md)
+```
 ---
 
 ## Screenshots
@@ -222,7 +223,7 @@ If the screenshots are not available yet, keep this section and add the image fi
 ## Live Demo
 
 Example public endpoints:
-![OpenZooData Demo Zoo](www.openzoodata.org)
+[OpenZooData Demo Zoo QR](https://www.openzoodata.org)
 
 ```text
 https://api.openzoodata.org/status
@@ -419,6 +420,11 @@ SQLite bundles are designed for offline mobile clients and can contain species, 
 | `/api/v1/admin/zoos` | Admin zoo management |
 | `/api/v1/admin/users` | Admin user management |
 
+See:
+```markdown
+[OpenZooData Architecture](docs/api.md)
+```
+
 ---
 
 ## Federation Model
@@ -449,6 +455,10 @@ This model is deliberately close to how the open web works:
 - institutions are not forced into a single central platform,
 - data remains reusable and machine-readable.
 
+See:
+```markdown
+[OpenZooData Architecture](docs/federation.md)
+```
 
 ---
 
@@ -480,9 +490,10 @@ Example species data fields may include:
   "population_trend": "decreasing"
 }
 ```
-
-![OpenZooData GBIF integration](docs/gbif.md)
-![OpenZooData Wikidata integration](docs/wikidata.md)
+See:
+```markdown
+[OpenZooData GBIF integration](docs/gbif.md)
+```
 
 ---
 
@@ -556,6 +567,11 @@ openZooData/
 ## Running Tests
 
 ### Setup
+
+See:
+```markdown
+[OpenZooData Architecture](docs/quickstart.md)
+```
 
 ```bash
 cp tests/.env.example tests/.env
@@ -709,8 +725,9 @@ CONTRIBUTING.md
 Please do not report security vulnerabilities publicly.
 
 See:
-![OpenZooData Federation Model](SECURITY.md)
-
+```markdown
+[OpenZooData Federation Model](SECURITY.md)
+```
 
 Security contact:
 
@@ -730,7 +747,9 @@ thorsten@codelab.cafe
 | Name and logos | Trademark protected |
 
 See:
-![OpenZooData License](DATA_LICENSE.md)
+```markdown
+[OpenZooData Federation Model](DATA_LICENSE.md)
+```
 
 Note: species imagery may originate from Wikimedia Commons and can have individual licenses. Consumers should preserve and display image attribution where required.
 
