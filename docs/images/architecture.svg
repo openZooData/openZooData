@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="850" viewBox="0 0 1400 850" role="img" aria-labelledby="title desc">
+  <title id="title">OpenZooData Architecture</title>
+  <desc id="desc">Federated publishing infrastructure for zoo biodiversity data</desc>
+  <defs>
+    <style>
+      .bg { fill: #f8fafc; }
+      .title { font: 700 44px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #0f172a; }
+      .subtitle { font: 400 22px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #475569; }
+      .box { fill: #ffffff; stroke: #cbd5e1; stroke-width: 2; rx: 18; }
+      .box2 { fill: #eef6ff; stroke: #93c5fd; stroke-width: 2; rx: 18; }
+      .box3 { fill: #f0fdf4; stroke: #86efac; stroke-width: 2; rx: 18; }
+      .box4 { fill: #fff7ed; stroke: #fdba74; stroke-width: 2; rx: 18; }
+      .label { font: 700 22px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #0f172a; }
+      .small { font: 400 16px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #475569; }
+      .tiny { font: 400 14px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #64748b; }
+      .arrow { stroke: #334155; stroke-width: 3; fill: none; marker-end: url(#arrowhead); }
+      .dashed { stroke: #64748b; stroke-width: 3; fill: none; stroke-dasharray: 8 8; marker-end: url(#arrowhead); }
+      .pill { fill: #e2e8f0; rx: 12; }
+      .pilltext { font: 600 14px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #334155; }
+    </style>
+    <marker id="arrowhead" markerWidth="12" markerHeight="8" refX="10" refY="4" orient="auto">
+      <polygon points="0 0, 12 4, 0 8" fill="#334155"/>
+    </marker>
+  </defs>
+  <rect class="bg" x="0" y="0" width="1400" height="850"/>
+  <text class="title" x="60" y="70">OpenZooData Architecture</text>
+  <text class="subtitle" x="60" y="108">Federated publishing infrastructure for zoo biodiversity data</text>
+  <rect class="box2" x="90" y="190" width="270" height="130" rx="18"/>
+<text class="label" x="114" y="232">👥</text>
+<text class="label" x="158" y="234">Zoo Staff / Tools</text>
+<text class="small" x="114" y="268">Admin UI, ZooCreator</text>
+<text class="small" x="114" y="292">OCR-assisted workflows</text>
+<rect class="box" x="545" y="180" width="310" height="160" rx="18"/>
+<text class="label" x="569" y="222">🦁</text>
+<text class="label" x="613" y="224">OpenZooData Server</text>
+<text class="small" x="569" y="258">Flask REST API</text>
+<text class="small" x="569" y="282">RSS feeds · SQLite export</text>
+<text class="small" x="569" y="306">Media · Auth · Publishing</text>
+<rect class="box3" x="1040" y="160" width="260" height="120" rx="18"/>
+<text class="label" x="1064" y="202">🌍</text>
+<text class="label" x="1108" y="204">Public Consumers</text>
+<text class="small" x="1064" y="238">Researchers</text>
+<text class="small" x="1064" y="262">Apps · Aggregators</text>
+<rect class="box4" x="470" y="470" width="260" height="120" rx="18"/>
+<text class="label" x="494" y="512">🐘</text>
+<text class="label" x="538" y="514">PostgreSQL Zoo DB</text>
+<text class="small" x="494" y="548">Species, enclosures</text>
+<text class="small" x="494" y="572">births, feeding times</text>
+<rect class="box4" x="760" y="470" width="250" height="120" rx="18"/>
+<text class="label" x="784" y="512">🔐</text>
+<text class="label" x="828" y="514">Auth DB</text>
+<text class="small" x="784" y="548">Users, roles</text>
+<text class="small" x="784" y="572">tokens, tenants</text>
+<rect class="box3" x="1040" y="390" width="260" height="115" rx="18"/>
+<text class="label" x="1064" y="432">📚</text>
+<text class="label" x="1108" y="434">Wikidata</text>
+<text class="small" x="1064" y="468">Q-IDs, taxonomy</text>
+<text class="small" x="1064" y="492">labels, media</text>
+<rect class="box3" x="1040" y="560" width="260" height="115" rx="18"/>
+<text class="label" x="1064" y="602">🧬</text>
+<text class="label" x="1108" y="604">GBIF Backbone</text>
+<text class="small" x="1064" y="638">Taxon keys</text>
+<text class="small" x="1064" y="662">taxonomy anchor</text>
+<rect class="box2" x="545" y="690" width="310" height="95" rx="18"/>
+<text class="label" x="569" y="732">💾</text>
+<text class="label" x="613" y="734">Offline SQLite Bundle</text>
+<text class="small" x="569" y="768">Mobile-first distribution without permanent connectivity</text>
+<path class="arrow" d="M360 255 L545 255"/><path class="arrow" d="M855 240 L1040 220"/><path class="arrow" d="M640 340 L600 470"/><path class="arrow" d="M760 340 L850 470"/><path class="arrow" d="M855 260 L1040 430"/><path class="arrow" d="M855 290 L1040 600"/><path class="arrow" d="M700 340 L700 690"/><path class="arrow" d="M855 735 L1040 735"/><rect class="box3" x="1040" y="690" width="260" height="95" rx="18"/>
+<text class="label" x="1064" y="732">📱</text>
+<text class="label" x="1108" y="734">Offline Apps</text>
+<text class="small" x="1064" y="768">ZooGuide, Android</text>
+<text class="small" x="1064" y="792">other clients</text>
+
+</svg>

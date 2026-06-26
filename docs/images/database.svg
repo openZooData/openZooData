@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="850" viewBox="0 0 1400 850" role="img" aria-labelledby="title desc">
+  <title id="title">Core Data Model</title>
+  <desc id="desc">Global species are separated from zoo-specific presence records</desc>
+  <defs>
+    <style>
+      .bg { fill: #f8fafc; }
+      .title { font: 700 44px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #0f172a; }
+      .subtitle { font: 400 22px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #475569; }
+      .box { fill: #ffffff; stroke: #cbd5e1; stroke-width: 2; rx: 18; }
+      .box2 { fill: #eef6ff; stroke: #93c5fd; stroke-width: 2; rx: 18; }
+      .box3 { fill: #f0fdf4; stroke: #86efac; stroke-width: 2; rx: 18; }
+      .box4 { fill: #fff7ed; stroke: #fdba74; stroke-width: 2; rx: 18; }
+      .label { font: 700 22px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #0f172a; }
+      .small { font: 400 16px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #475569; }
+      .tiny { font: 400 14px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #64748b; }
+      .arrow { stroke: #334155; stroke-width: 3; fill: none; marker-end: url(#arrowhead); }
+      .dashed { stroke: #64748b; stroke-width: 3; fill: none; stroke-dasharray: 8 8; marker-end: url(#arrowhead); }
+      .pill { fill: #e2e8f0; rx: 12; }
+      .pilltext { font: 600 14px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #334155; }
+    </style>
+    <marker id="arrowhead" markerWidth="12" markerHeight="8" refX="10" refY="4" orient="auto">
+      <polygon points="0 0, 12 4, 0 8" fill="#334155"/>
+    </marker>
+  </defs>
+  <rect class="bg" x="0" y="0" width="1400" height="850"/>
+  <text class="title" x="60" y="70">Core Data Model</text>
+  <text class="subtitle" x="60" y="108">Global species are separated from zoo-specific presence records</text>
+  <rect class="box2" x="545" y="155" width="300" height="115" rx="18"/>
+<text class="label" x="569" y="197">🧬</text>
+<text class="label" x="613" y="199">Species</text>
+<text class="small" x="569" y="233">Global taxonomic entity</text>
+<text class="small" x="569" y="257">Wikidata + GBIF IDs</text>
+<rect class="box3" x="110" y="360" width="270" height="115" rx="18"/>
+<text class="label" x="134" y="402">🏛️</text>
+<text class="label" x="178" y="404">Zoo</text>
+<text class="small" x="134" y="438">Publishing institution</text>
+<text class="small" x="134" y="462">source of authority</text>
+<rect class="box4" x="545" y="360" width="300" height="120" rx="18"/>
+<text class="label" x="569" y="402">📍</text>
+<text class="label" x="613" y="404">Enclosure Species</text>
+<text class="small" x="569" y="438">Zoo-specific presence</text>
+<text class="small" x="569" y="462">local assignment</text>
+<rect class="box3" x="985" y="360" width="280" height="115" rx="18"/>
+<text class="label" x="1009" y="402">🏗️</text>
+<text class="label" x="1053" y="404">Enclosure / House</text>
+<text class="small" x="1009" y="438">Physical zoo context</text>
+<text class="small" x="1009" y="462">open-air or indoor</text>
+<rect class="box" x="305" y="610" width="245" height="110" rx="18"/>
+<text class="label" x="329" y="652">🐣</text>
+<text class="label" x="373" y="654">Birth Records</text>
+<text class="small" x="329" y="688">Managed population events</text>
+<rect class="box" x="580" y="610" width="245" height="110" rx="18"/>
+<text class="label" x="604" y="652">⏱️</text>
+<text class="label" x="648" y="654">Feeding Times</text>
+<text class="small" x="604" y="688">Local schedule data</text>
+<rect class="box" x="855" y="610" width="245" height="110" rx="18"/>
+<text class="label" x="879" y="652">🗺️</text>
+<text class="label" x="923" y="654">Geo Points</text>
+<text class="small" x="879" y="688">Map positions</text>
+<path class="arrow" d="M695 270 L695 360"/><path class="arrow" d="M380 418 L545 418"/><path class="arrow" d="M985 418 L845 418"/><path class="arrow" d="M620 480 L430 610"/><path class="arrow" d="M695 480 L700 610"/><path class="arrow" d="M770 480 L975 610"/>
+</svg>
