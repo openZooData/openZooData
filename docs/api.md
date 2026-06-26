@@ -5,7 +5,7 @@
 This document provides a high-level overview of the OpenZooData API.
 
 For a detailed API overvierw please refer to 
-[Detailed API Reference](docs/api_detail.md)
+[Detailed API Reference](api_detail.md)
 
 The API is split into:
 
