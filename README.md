@@ -139,27 +139,21 @@ OpenZooData follows a federated architecture. Each zoo can operate its own serve
 flowchart TD
     staff[Zoo Staff] --> creator[ZooCreator / Admin Tools]
     creator --> server[OpenZooData Server]
-
     server --> api[REST API]
     server --> rss[RSS Discovery Feeds]
     server --> sqlite[SQLite Offline Bundles]
     server --> media[Media Store]
-
     server --> pg[(PostgreSQL)]
     server --> auth[(Auth Database)]
-
     server --> wd[Wikidata]
     server --> gbif[GBIF Backbone Taxonomy]
-
     api --> researchers[Researchers and Developers]
     rss --> aggregators[Aggregators]
     sqlite --> apps[Offline Mobile Apps]
     sqlite --> zooguide[ZooGuide]
-
-    wd --> graph[Global Biodiversity Knowledge Graph]
-    gbif --> graph
+    wd --> knowledge_graph[Global Biodiversity Knowledge Graph]
+    gbif --> knowledge_graph
 ```
-![OpenZooData Architecture](docs/images/architecture.svg)
 
 ### Data flow
 
@@ -180,6 +174,9 @@ sequenceDiagram
     Server->>Feed: Publish REST, RSS and SQLite data
     Feed->>App: Offline-capable biodiversity dataset
 ```
+
+See:
+[OpenZooData Architecture](docs/architecture.md)
 
 ---
 
@@ -212,6 +209,7 @@ sequenceDiagram
 ## Live Demo
 
 Example public endpoints:
+[OpenZooData Demo Zoo QR](https://www.openzoodata.org)
 
 ```text
 https://api.openzoodata.org/status
@@ -408,6 +406,9 @@ SQLite bundles are designed for offline mobile clients and can contain species, 
 | `/api/v1/admin/zoos` | Admin zoo management |
 | `/api/v1/admin/users` | Admin user management |
 
+See:
+[OpenZooData API](docs/api.md)
+
 ---
 
 ## Federation Model
@@ -438,7 +439,8 @@ This model is deliberately close to how the open web works:
 - institutions are not forced into a single central platform,
 - data remains reusable and machine-readable.
 
-![OpenZooData Federation Model](docs/images/federation.svg)
+See:
+[OpenZooData Federation](docs/federation.md)
 
 ---
 
@@ -470,13 +472,8 @@ Example species data fields may include:
   "population_trend": "decreasing"
 }
 ```
-
-Further documentation:
-
-```text
-docs/wikidata_integration.md
-docs/gbif.md
-```
+See:
+[OpenZooData GBIF integration](docs/gbif.md)
 
 ---
 
@@ -550,6 +547,9 @@ openZooData/
 ## Running Tests
 
 ### Setup
+
+See:
+[OpenZooData Quickstart](docs/quickstart.md)
 
 ```bash
 cp tests/.env.example tests/.env
@@ -691,10 +691,7 @@ Useful contribution areas include:
 - sample datasets.
 
 See:
-
-```text
-CONTRIBUTING.md
-```
+[OpenZooData Contributing](CONTRIBUTING.md)
 
 ---
 
@@ -703,10 +700,7 @@ CONTRIBUTING.md
 Please do not report security vulnerabilities publicly.
 
 See:
-
-```text
-SECURITY.md
-```
+[OpenZooData Security](SECURITY.md)
 
 Security contact:
 
@@ -726,11 +720,7 @@ thorsten@codelab.cafe
 | Name and logos | Trademark protected |
 
 See:
-
-```text
-LICENSE
-DATA_LICENSE.md
-```
+[OpenZooData License Model](DATA_LICENSE.md)
 
 Note: species imagery may originate from Wikimedia Commons and can have individual licenses. Consumers should preserve and display image attribution where required.
 
