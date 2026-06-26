@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="850" viewBox="0 0 1400 850" role="img" aria-labelledby="title desc">
+  <title id="title">Security Boundary</title>
+  <desc id="desc">Public read access is separated from authenticated write and administration workflows</desc>
+  <defs>
+    <style>
+      .bg { fill: #f8fafc; }
+      .title { font: 700 44px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #0f172a; }
+      .subtitle { font: 400 22px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #475569; }
+      .box { fill: #ffffff; stroke: #cbd5e1; stroke-width: 2; rx: 18; }
+      .box2 { fill: #eef6ff; stroke: #93c5fd; stroke-width: 2; rx: 18; }
+      .box3 { fill: #f0fdf4; stroke: #86efac; stroke-width: 2; rx: 18; }
+      .box4 { fill: #fff7ed; stroke: #fdba74; stroke-width: 2; rx: 18; }
+      .label { font: 700 22px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #0f172a; }
+      .small { font: 400 16px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #475569; }
+      .tiny { font: 400 14px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #64748b; }
+      .arrow { stroke: #334155; stroke-width: 3; fill: none; marker-end: url(#arrowhead); }
+      .dashed { stroke: #64748b; stroke-width: 3; fill: none; stroke-dasharray: 8 8; marker-end: url(#arrowhead); }
+      .pill { fill: #e2e8f0; rx: 12; }
+      .pilltext { font: 600 14px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #334155; }
+    </style>
+    <marker id="arrowhead" markerWidth="12" markerHeight="8" refX="10" refY="4" orient="auto">
+      <polygon points="0 0, 12 4, 0 8" fill="#334155"/>
+    </marker>
+  </defs>
+  <rect class="bg" x="0" y="0" width="1400" height="850"/>
+  <text class="title" x="60" y="70">Security Boundary</text>
+  <text class="subtitle" x="60" y="108">Public read access is separated from authenticated write and administration workflows</text>
+  <rect class="box2" x="95" y="220" width="270" height="120" rx="18"/>
+<text class="label" x="119" y="262">👤</text>
+<text class="label" x="163" y="264">User / Client</text>
+<text class="small" x="119" y="298">JWT or public read access</text>
+<rect class="box" x="545" y="200" width="310" height="160" rx="18"/>
+<text class="label" x="569" y="242">🛡️</text>
+<text class="label" x="613" y="244">OpenZooData API</text>
+<text class="small" x="569" y="278">Authentication</text>
+<text class="small" x="569" y="302">rate limiting</text>
+<text class="small" x="569" y="326">role checks</text>
+<rect class="box3" x="1035" y="160" width="270" height="115" rx="18"/>
+<text class="label" x="1059" y="202">🌍</text>
+<text class="label" x="1103" y="204">Public Read</text>
+<text class="small" x="1059" y="238">Feeds, species, zoo data</text>
+<rect class="box4" x="1035" y="340" width="270" height="115" rx="18"/>
+<text class="label" x="1059" y="382">✍️</text>
+<text class="label" x="1103" y="384">Protected Write</text>
+<text class="small" x="1059" y="418">Admin and editorial APIs</text>
+<rect class="box4" x="545" y="560" width="310" height="120" rx="18"/>
+<text class="label" x="569" y="602">🔐</text>
+<text class="label" x="613" y="604">Auth Database</text>
+<text class="small" x="569" y="638">users · roles · tokens</text>
+<text class="small" x="569" y="662">tenant and zoo permissions</text>
+<rect class="box" x="1035" y="560" width="270" height="120" rx="18"/>
+<text class="label" x="1059" y="602">📈</text>
+<text class="label" x="1103" y="604">Audit / Monitoring</text>
+<text class="small" x="1059" y="638">health checks</text>
+<text class="small" x="1059" y="662">security tests</text>
+<path class="arrow" d="M365 280 L545 280"/><path class="arrow" d="M855 260 L1035 215"/><path class="arrow" d="M855 305 L1035 395"/><path class="arrow" d="M700 360 L700 560"/><path class="arrow" d="M855 620 L1035 620"/>
+</svg>
