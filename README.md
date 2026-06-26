@@ -9,6 +9,8 @@
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-required-blue.svg)](https://www.postgresql.org/)
 [![Status: Alpha](https://img.shields.io/badge/Status-Alpha-orange.svg)](#project-status)
+![Status](https://img.shields.io/badge/Status-Alpha-orange.svg)  ![Tests](https://github.com/openZooData/openZooData/actions/workflows/test.yml/badge.svg)
+
 
 OpenZooData is an open-source publishing platform that enables zoological institutions to share structured biodiversity data as open, machine-readable datasets.
 
