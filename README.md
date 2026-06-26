@@ -159,7 +159,6 @@ flowchart TD
     wd --> graph[Global Biodiversity Knowledge Graph]
     gbif --> graph
 ```
-![OpenZooData Architecture](docs/images/architecture.svg)
 
 ### Data flow
 
@@ -181,10 +180,9 @@ sequenceDiagram
     Feed->>App: Offline-capable biodiversity dataset
 ```
 
-A detailed architecture document can be added at:
 
-```text
-docs/architecture.md
+```
+![OpenZooData Architecture](docs/architecture.md)
 ```
 
 ---
@@ -485,11 +483,10 @@ Example species data fields may include:
 }
 ```
 
-Further documentation:
 
 ```text
-docs/wikidata_integration.md
-docs/gbif.md
+![OpenZooData GBIF integration](docs/gbif.md)
+![OpenZooData Wikidata integration](docs/wikidata.md)
 ```
 
 ---
@@ -719,7 +716,7 @@ Please do not report security vulnerabilities publicly.
 See:
 
 ```text
-SECURITY.md
+![OpenZooData Federation Model](SECURITY.md)
 ```
 
 Security contact:
@@ -742,8 +739,7 @@ thorsten@codelab.cafe
 See:
 
 ```text
-LICENSE
-DATA_LICENSE.md
+![OpenZooData License](DATA_LICENSE.md)
 ```
 
 Note: species imagery may originate from Wikimedia Commons and can have individual licenses. Consumers should preserve and display image attribution where required.
