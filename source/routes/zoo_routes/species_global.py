@@ -170,6 +170,16 @@ def create_species():
                 ON CONFLICT DO NOTHING
             """, (species_id, german_name))
 
+            # Leere species_texts-Zeilen für alle 5 Felder anlegen.
+            # Werden später durch enrich_species_texts.py (Cronjob) befüllt.
+            # translations_valid bleibt FALSE bis alle Felder + Sprachen gefüllt sind.
+            for field in ("description", "habitat", "food", "family_life", "fun_fact"):
+                cur.execute("""
+                    INSERT INTO zoo.species_texts (species_id, field)
+                    VALUES (%s, %s)
+                    ON CONFLICT DO NOTHING
+                """, (species_id, field))
+
             # Media-Eintrag für Icon anlegen und icon_media_id direkt verknüpfen
             if wikidata_id:
                 filename = build_species_filename(
