@@ -59,7 +59,7 @@ def fetch_taxonomy(pg) -> List[tuple]:
     with pg.cursor() as cur:
         cur.execute("""
             SELECT id, wikidata_id, rank, name
-            FROM taxonomy
+            FROM zoo.taxonomy
             ORDER BY rank, name
         """)
         return cur.fetchall()
@@ -150,7 +150,7 @@ def fetch_feeding_times(pg, zoo_id: int) -> List[tuple]:
             SELECT ft.id, ft.enclosure_species_id, ft.species_id,
                    ft.feeding_time::TEXT, ft.day_of_week,
                    ft.note, ft.is_public::INT
-            FROM feeding_times ft
+            FROM zoo.feeding_times ft
             JOIN enclosure_species es ON es.id = ft.enclosure_species_id
             WHERE es.zoo_id = %s
         """, (zoo_id,))
@@ -174,7 +174,7 @@ def fetch_location_species(pg, zoo_id: int) -> List[tuple]:
     with pg.cursor() as cur:
         cur.execute("""
             SELECT ls.location_id, ls.species_id, ls.note
-            FROM location_species ls
+            FROM zoo.location_species ls
             JOIN locations l ON l.id = ls.location_id
             WHERE l.zoo_id = %s
         """, (zoo_id,))
@@ -187,7 +187,7 @@ def fetch_opening_hours(pg, zoo_id: int) -> List[tuple]:
             SELECT oh.id, oh.location_id, oh.day_of_week,
                    oh.open_time::TEXT, oh.close_time::TEXT,
                    oh.valid_from::TEXT, oh.valid_until::TEXT, oh.label
-            FROM opening_hours oh
+            FROM zoo.opening_hours oh
             JOIN locations l ON l.id = oh.location_id
             WHERE l.zoo_id = %s
         """, (zoo_id,))
@@ -200,7 +200,7 @@ def fetch_house_opening_hours(pg, zoo_id: int) -> List[tuple]:
             SELECT hoh.id, hoh.house_id, hoh.day_of_week,
                    hoh.open_time::TEXT, hoh.close_time::TEXT,
                    hoh.valid_from::TEXT, hoh.valid_until::TEXT, hoh.label
-            FROM house_opening_hours hoh
+            FROM zoo.house_opening_hours hoh
             JOIN houses h ON h.id = hoh.house_id
             WHERE h.zoo_id = %s
         """, (zoo_id,))
@@ -224,16 +224,16 @@ def fetch_geo_points(pg, zoo_id: int) -> List[tuple]:
         cur.execute("""
             SELECT g.id, g.entity_type, g.entity_id,
                    g.latitude, g.longitude, g.translation_id, g.sort_order
-            FROM geo_points g
+            FROM zoo.geo_points g
             WHERE (g.entity_type = 'zoo' AND g.entity_id = %s)
             OR (g.entity_type = 'location' AND g.entity_id IN (
-                SELECT id FROM locations WHERE zoo_id = %s))
+                SELECT id FROM zoo.locations WHERE zoo_id = %s))
             OR (g.entity_type = 'enclosure' AND g.entity_id IN (
-                SELECT id FROM enclosures WHERE zoo_id = %s))
+                SELECT id FROM zoo.enclosures WHERE zoo_id = %s))
             OR (g.entity_type = 'house' AND g.entity_id IN (
-                SELECT id FROM houses WHERE zoo_id = %s))
+                SELECT id FROM zoo.houses WHERE zoo_id = %s))
             OR (g.entity_type = 'enclosure_species' AND g.entity_id IN (
-                SELECT id FROM enclosure_species WHERE zoo_id = %s))
+                SELECT id FROM zoo.enclosure_species WHERE zoo_id = %s))
             ORDER BY g.entity_type, g.entity_id, g.sort_order
         """, (zoo_id, zoo_id, zoo_id, zoo_id, zoo_id))
         return cur.fetchall()
@@ -258,25 +258,24 @@ def fetch_translations(pg, zoo_id: int) -> List[tuple]:
             SELECT t.entity_type, t.entity_id, t.field,
                    t.de, t.en, t.es, t.fr, t.it,
                    t.nl, t.pl, t.pt, t.ru, t.tr, t.uk, t.zh_hans
-            FROM translations t
+            FROM zoo.translations t
             WHERE
                 (t.entity_type = 'location' AND t.entity_id IN (
-                    SELECT id FROM locations WHERE zoo_id = %s))
+                    SELECT id FROM zoo.locations WHERE zoo_id = %s))
                 OR
                 (t.entity_type = 'enclosure' AND t.entity_id IN (
-                    SELECT id FROM enclosures WHERE zoo_id = %s))
+                    SELECT id FROM zoo.enclosures WHERE zoo_id = %s))
                 OR
                 (t.entity_type = 'house' AND t.entity_id IN (
-                    SELECT id FROM houses WHERE zoo_id = %s))
+                    SELECT id FROM zoo.houses WHERE zoo_id = %s))
                 OR
                 (t.entity_type = 'domain' AND t.entity_id IN (
-                    SELECT id FROM domains WHERE zoo_id = %s OR zoo_id IS NULL))
+                    SELECT id FROM zoo.domains WHERE zoo_id = %s OR zoo_id IS NULL))
                 OR
                 (t.entity_type = 'species' AND t.entity_id IN (
                     SELECT DISTINCT es.species_id
-                    FROM enclosure_species es
-                    JOIN enclosures e ON e.id = es.enclosure_id
-                    WHERE e.zoo_id = %s))
+                    FROM zoo.enclosure_species es
+                    WHERE es.zoo_id = %s))
                 OR
                 t.entity_type = 'location_type'
                 OR
@@ -315,11 +314,11 @@ def get_zoo_ids(pg, slugs: List[str]) -> List[tuple]:
     with pg.cursor() as cur:
         if slugs:
             cur.execute(
-                "SELECT id, slug FROM zoos WHERE slug = ANY(%s) ORDER BY slug",
+                "SELECT id, slug FROM zoo.zoos WHERE slug = ANY(%s) ORDER BY slug",
                 (slugs,)
             )
         else:
             cur.execute(
-                "SELECT id, slug FROM zoos WHERE is_active = TRUE ORDER BY slug"
+                "SELECT id, slug FROM zoo.zoos WHERE is_active = TRUE ORDER BY slug"
             )
         return cur.fetchall()
