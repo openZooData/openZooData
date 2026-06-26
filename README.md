@@ -180,32 +180,6 @@ See:
 
 ---
 
-## Screenshots
-
-### ZooCreator (under development)
-    The following screenshots document the current editor workflow for managing zoo data, species entries, OCR-assisted Latin name scanning, API retrieval, species updates, and RSS export.
-
-<p align="center">
-  <img src="docs/images/screenshots/ZooCreator/ZooEditor.png" width="45%" alt="ZooCreator editor overview">
-  <img src="docs/images/screenshots/ZooCreator/SpeciesList.png" width="45%" alt="ZooCreator species list">
-</p>
-
-<p align="center">
-  <img src="docs/images/screenshots/ZooCreator/Addspecies.png" width="45%" alt="ZooCreator add species screen">
-  <img src="docs/images/screenshots/ZooCreator/LatinNameScan.png" width="45%" alt="ZooCreator Latin name OCR scan">
-</p>
-
-<p align="center">
-  <img src="docs/images/screenshots/ZooCreator/SpeciesRetreived.png" width="45%" alt="ZooCreator retrieved species data">
-  <img src="docs/images/screenshots/ZooCreator/UpdatedSpeciesList.png" width="45%" alt="ZooCreator updated species list">´
-</p>
-
-<p align="center">
-    <img src="docs/images/screenshots/ZooCreator/RSS_export.png" width="45%" alt="ZooCreator RSS export">
-</p>
-
----
-
 ## Live Demo
 
 Example public endpoints:
