@@ -4,13 +4,6 @@
 
 This document describes the API exposed by the Flask application under `source/app.py` and the registered route blueprints.
 
-It is intended to be integrated into the official repository as:
-
-```text
-docs/api_detail.md
-```
-
----
 
 ## Status of this document
 
