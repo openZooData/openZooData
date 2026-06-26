@@ -25,18 +25,24 @@ import psycopg2.extras
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
 
+from pathlib import Path
+
 def load_env():
     env = {}
-    for path in [Path.home() / ".env"]:
-        if path.exists():
-            for line in path.read_text().splitlines():
+    for path in [
+        Path(__file__).parent.parent.parent / ".env",  # Projektverzeichnis
+        Path.home() / ".env",                          # Fallback
+    ]:
+        if not path.exists():
+            continue
+        with open(path, encoding="utf-8") as f:
+            for line in f:
                 line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    k, v = line.split("=", 1)
-                    env[k.strip()] = v.strip().strip('"').strip("'")
-            break
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                env[key.strip()] = value.strip().strip('"').strip("'")
     return env
-
 
 env = load_env()
 
