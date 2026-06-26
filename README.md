@@ -181,46 +181,31 @@ sequenceDiagram
     Feed->>App: Offline-capable biodiversity dataset
 ```
 
-A detailed architecture document can be added at:
-
-```text
-docs/architecture.md
-```
-
 ---
 
 ## Screenshots
 
-Screenshots should be stored in:
-
-```text
-docs/images/
-```
-
-Recommended file names:
-
-```text
-docs/images/zoo-guide-map.png
-docs/images/zoo-guide-animal.png
-docs/images/zoo-creator-ocr.png
-docs/images/api-response.png
-docs/images/qr-feed.png
-docs/images/admin-overview.png
-```
-
-Suggested README layout:
+### ZooCreator (under development)
+    The following screenshots document the current editor workflow for managing zoo data, species entries, OCR-assisted Latin name scanning, API retrieval, species updates, and RSS export.
 
 <p align="center">
-  <img src="docs/images/zoo-guide-map.png" width="45%" alt="ZooGuide map screenshot">
-  <img src="docs/images/zoo-guide-animal.png" width="45%" alt="ZooGuide animal detail screenshot">
+  <img src="docs/images/screenshots/ZooCreator/ZooEditor.png" width="45%" alt="ZooCreator editor overview">
+  <img src="docs/images/screenshots/ZooCreator/SpeciesList.png" width="45%" alt="ZooCreator species list">
 </p>
 
 <p align="center">
-  <img src="docs/images/zoo-creator-ocr.png" width="45%" alt="ZooCreator OCR workflow screenshot">
-  <img src="docs/images/api-response.png" width="45%" alt="OpenZooData API response screenshot">
+  <img src="docs/images/screenshots/ZooCreator/Addspecies.png" width="45%" alt="ZooCreator add species screen">
+  <img src="docs/images/screenshots/ZooCreator/LatinNameScan.png" width="45%" alt="ZooCreator Latin name OCR scan">
 </p>
 
-If the screenshots are not available yet, keep this section and add the image files later. GitHub will render them automatically once the files exist.
+<p align="center">
+  <img src="docs/images/screenshots/ZooCreator/SpeciesRetreived.png" width="45%" alt="ZooCreator retrieved species data">
+  <img src="docs/images/screenshots/ZooCreator/UpdatedSpeciesList.png" width="45%" alt="ZooCreator updated species list">´
+</p>
+
+<p align="center">
+    <img src="docs/images/screenshots/ZooCreator/RSS_export.png" width="45%" alt="ZooCreator RSS export">
+</p>
 
 ---
 
