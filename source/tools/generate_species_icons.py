@@ -228,12 +228,16 @@ def has_alpha(img_bytes: bytes) -> bool:
 
 # ─── DB-Helpers ───────────────────────────────────────────────────────────────
 
-def get_pending_species(pg, species_id: int | None, limit: int) -> list:
-    """Gibt Species zurück, die noch kein Icon haben."""
+def get_pending_species(pg, species_id: int | None, limit: int,
+                        force: bool = False) -> list:
+    """Gibt Species zurück, die noch kein Icon haben (oder alle bei --force)."""
 
     with pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         params = []
-        where = "s.icon_media_id IS NULL AND s.id_valid = TRUE"
+        where  = "s.id_valid = TRUE"
+
+        if not force:
+            where += " AND s.icon_media_id IS NULL"
 
         if species_id:
             where += " AND s.id = %s"
@@ -243,7 +247,7 @@ def get_pending_species(pg, species_id: int | None, limit: int) -> list:
 
         cur.execute(
             f"""
-            SELECT s.id, s.wikidata_id, s.german_name, s.latin_name
+            SELECT s.id, s.wikidata_id, s.german_name, s.latin_name, s.icon_media_id
             FROM zoo.species s
             WHERE {where}
             ORDER BY s.german_name
@@ -327,6 +331,12 @@ def main():
         help="Maximale Anzahl Icons pro Lauf, default: 50",
     )
 
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Icon auch für Species generieren die bereits icon_media_id haben (überschreibt Datei + DB-Eintrag)",
+    )
+
     args = parser.parse_args()
 
     api_key = env.get("OPENAI_API_KEY_1") or env.get("OPENAI_API_KEY")
@@ -341,7 +351,7 @@ def main():
         logging.error(f"DB-Verbindung fehlgeschlagen: {e}")
         sys.exit(1)
 
-    pending = get_pending_species(pg, args.species, args.limit)
+    pending = get_pending_species(pg, args.species, args.limit, args.force)
 
     if not pending:
         logging.info("Alle Species haben bereits ein Icon — nichts zu tun")
@@ -418,6 +428,17 @@ def main():
             continue
 
         try:
+            # Bei --force: alten media-Eintrag löschen
+            if args.force and s.get("icon_media_id"):
+                with pg.cursor() as cur:
+                    cur.execute("""
+                        DELETE FROM zoo.media WHERE id = %s
+                    """, (s["icon_media_id"],))
+                    cur.execute("""
+                        UPDATE zoo.species SET icon_media_id = NULL WHERE id = %s
+                    """, (species_id,))
+                logging.info(f"  → Alter media-Eintrag (id={s['icon_media_id']}) gelöscht")
+
             media_id = create_media_entry(pg, species_id, None, filename)
             link_media_to_species(pg, species_id, media_id)
             pg.commit()

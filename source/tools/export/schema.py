@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS houses (
 CREATE TABLE IF NOT EXISTS zoo_opening_hours (
     id          INTEGER PRIMARY KEY,
     zoo_id      INTEGER NOT NULL,
-    day_of_week TEXT NOT NULL,
+    day_of_week TEXT,
     open_time   TEXT,
     close_time  TEXT,
     valid_from  TEXT,
@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS zoo_opening_hours (
 CREATE TABLE IF NOT EXISTS house_opening_hours (
     id          INTEGER PRIMARY KEY,
     house_id    INTEGER NOT NULL,
-    day_of_week TEXT NOT NULL,
+    day_of_week TEXT,
     open_time   TEXT,
     close_time  TEXT,
     valid_from  TEXT,
@@ -132,7 +132,7 @@ CREATE TABLE IF NOT EXISTS location_species (
 CREATE TABLE IF NOT EXISTS opening_hours (
     id          INTEGER PRIMARY KEY,
     location_id INTEGER NOT NULL,
-    day_of_week TEXT NOT NULL,
+    day_of_week TEXT,
     open_time   TEXT,
     close_time  TEXT,
     valid_from  TEXT,

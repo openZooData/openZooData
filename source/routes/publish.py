@@ -78,7 +78,8 @@ def publish_zoo(zoo):
                 [venv_python, script_path, "--zoo", zoo],
                 capture_output=True,
                 text=True,
-                timeout=300
+                timeout=300,
+                cwd=os.path.join(os.path.dirname(__file__), "..")
             )
 
             duration_ms = int((time.time() - start_time) * 1000)

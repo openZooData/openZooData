@@ -2,14 +2,9 @@
 export/writer.py
 ----------------
 SQLite-Schreiblogik: _do_export, export_zoo, _increment_data_version.
-
-media_version wird NUR hochgezählt, wenn sich der Inhalt der Media-Dateien
-tatsächlich geändert hat (Content-Hash-Vergleich gegen zoo.zoos.media_hash).
-Voraussetzung: Spalte zoo.zoos.media_hash TEXT (Migration siehe unten).
 """
 
 import gzip
-import hashlib
 import logging
 import os
 import shutil
@@ -128,27 +123,21 @@ def _do_export(pg, zoo_id: int, slug: str, output_path: Path):
             tmp_sqlite.unlink()
 
 
-def build_media_bundle(pg, zoo_id: int, slug: str, output_dir: Path) -> Path:
+def build_media_bundle(pg, zoo_id: int, slug: str,
+                       output_dir: Path, media_version: int) -> Path:
     """
-    Baut das Media-Bundle als ZIP und entscheidet selbstständig, ob die
-    media_version hochgezählt wird.
-
-    Ablauf:
-      1) ZIP in temp schreiben, dabei SHA256-Content-Hash bilden
-         (über arcname + Inhaltslänge + Inhaltsbytes, sortiert nach arcname).
-      2) Aktuelle media_version + media_hash aus zoo.zoos lesen.
-      3) Hash unverändert UND aktuelles Bundle existiert auf Disk
-         -> nichts tun, bestehendes Bundle zurückgeben (KEIN Bump,
-            kein Client-Re-Download).
-      4) Sonst (Inhalt geändert oder Bundle fehlt):
-         -> media_version + 1, ZIP als <slug>_media_v<neu>.zip ablegen,
-            DB (media_version, media_hash) aktualisieren, alte Bundles löschen.
-
+    Baut das Media-Bundle als ZIP und schreibt es nach output_dir.
+    Dateiname: <slug>_media_v<media_version>.zip
     ZIP-Struktur: <slug>_media/<entity_type>/<filename>
+    Gleiche Struktur wie der bisherige GET /media-bundle/<zoo>-Endpoint.
+    Alte Bundle-Dateien desselben Zoos werden nach erfolgreichem Schreiben
+    gelöscht (nur die aktuelle Version bleibt).
     """
-    prefix      = f"{slug}_media"
-    storage_dir = Path(STORAGE_DIR)
-    tmp_path    = output_dir / f".tmp_bundle_{slug}_{os.getpid()}.zip"
+    bundle_filename = f"{slug}_media_v{media_version}.zip"
+    final_path      = output_dir / bundle_filename
+    tmp_path        = output_dir / f".tmp_bundle_{slug}_{os.getpid()}.zip"
+    prefix          = f"{slug}_media"
+    storage_dir     = Path(STORAGE_DIR)
 
     try:
         with pg.cursor() as cur:
@@ -174,75 +163,29 @@ def build_media_bundle(pg, zoo_id: int, slug: str, output_dir: Path) -> Path:
             species_media = cur.fetchall()
 
         media_rows = list(zoo_media) + list(species_media)
-
-        # Eindeutige Einträge, deterministisch nach arcname sortiert
-        # -> stabiler Hash, unabhängig von Query-Reihenfolge.
-        entries = []  # (arcname, full_path)
-        seen = set()
-        for storage_path, entity_type, filename in media_rows:
-            arcname = f"{prefix}/{entity_type}/{filename}"
-            if arcname in seen:
-                continue
-            seen.add(arcname)
-            entries.append((arcname, storage_dir / storage_path / filename))
-        entries.sort(key=lambda e: e[0])
-
-        hasher  = hashlib.sha256()
-        added   = 0
+        added = set()
         missing = 0
 
         with zipfile.ZipFile(str(tmp_path), mode="w",
                              compression=zipfile.ZIP_DEFLATED) as zf:
-            for arcname, full_path in entries:
+            for storage_path, entity_type, filename in media_rows:
+                arcname = f"{prefix}/{entity_type}/{filename}"
+                if arcname in added:
+                    continue
+                added.add(arcname)
+
+                full_path = storage_dir / storage_path / filename
                 if not full_path.is_file():
                     logging.warning(f"Media bundle: Datei nicht gefunden: {full_path}")
                     missing += 1
                     continue
-                data = full_path.read_bytes()
-                # Hash über Pfad + Länge + Inhalt
-                # -> erkennt Inhalt, Umbenennung, Add/Remove
-                hasher.update(arcname.encode("utf-8"))
-                hasher.update(len(data).to_bytes(8, "big"))
-                hasher.update(data)
-                zf.writestr(arcname, data)
-                added += 1
+
+                zf.write(str(full_path), arcname=arcname)
 
         if not tmp_path.is_file() or tmp_path.stat().st_size < 22:
             raise RuntimeError("Media-Bundle leer oder fehlgeschlagen")
 
-        content_hash = hasher.hexdigest()
-
-        # Aktuellen Stand lesen
-        with pg.cursor() as cur:
-            cur.execute("""
-                SELECT media_version, media_hash
-                FROM zoo.zoos WHERE id = %s
-            """, (zoo_id,))
-            row = cur.fetchone()
-            cur_version = row[0] if row and row[0] is not None else 0
-            cur_hash    = row[1] if row else None
-
-        current_bundle = output_dir / f"{slug}_media_v{cur_version}.zip"
-
-        # Unverändert UND aktuelles Bundle existiert -> nichts tun
-        if content_hash == cur_hash and current_bundle.is_file():
-            tmp_path.unlink()
-            logging.info(f"Media-Bundle {slug} unverändert (v{cur_version}, "
-                         f"{added} Dateien) — kein Bump")
-            return current_bundle
-
-        # Inhalt geändert (oder Bundle fehlt) -> Version hochzählen
-        new_version = cur_version + 1
-        final_path  = output_dir / f"{slug}_media_v{new_version}.zip"
         os.replace(tmp_path, final_path)
-
-        with pg.cursor() as cur:
-            cur.execute("""
-                UPDATE zoo.zoos
-                SET media_version = %s, media_hash = %s
-                WHERE id = %s
-            """, (new_version, content_hash, zoo_id))
-        pg.commit()
 
         # Alte Bundle-Versionen desselben Zoos aufräumen
         for old in output_dir.glob(f"{slug}_media_v*.zip"):
@@ -253,8 +196,9 @@ def build_media_bundle(pg, zoo_id: int, slug: str, output_dir: Path) -> Path:
                 except OSError:
                     pass
 
-        logging.info(f"Media-Bundle {slug} NEU: v{new_version} "
-                     f"({added} Dateien, {missing} fehlend, "
+        total = len(added)
+        logging.info(f"Media-Bundle {slug} OK: {bundle_filename} "
+                     f"({total} Dateien, {missing} fehlend, "
                      f"{final_path.stat().st_size / 1024:.1f} KB)")
         return final_path
 
@@ -298,11 +242,13 @@ def export_zoo(pg, zoo_id: int, slug: str, output_dir: Path) -> Path:
         logging.error(f"Export {slug} fehlgeschlagen: {e}")
         raise
 
-    # Media-Bundle nach erfolgreichem SQLite-Export bauen.
-    # build_media_bundle entscheidet selbst, ob media_version hochgezählt wird
-    # (nur bei tatsächlicher Änderung der Media-Dateien).
+    # Media-Bundle nach erfolgreichem SQLite-Export bauen
     try:
-        build_media_bundle(pg, zoo_id, slug, output_dir)
+        with pg.cursor() as cur:
+            cur.execute("SELECT media_version FROM zoo.zoos WHERE id = %s", (zoo_id,))
+            row = cur.fetchone()
+            media_version = row[0] if row else 0
+        build_media_bundle(pg, zoo_id, slug, output_dir, media_version)
     except Exception:
         # Media-Bundle-Fehler darf den SQLite-Export nicht rückgängig machen
         logging.exception(f"Media-Bundle {slug} fehlgeschlagen (SQLite-Export bleibt)")
