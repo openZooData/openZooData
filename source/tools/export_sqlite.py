@@ -16,8 +16,13 @@ Output:
 """
 
 import sys
+import os
 import logging
 import psycopg2
+
+# Skript wird als Subprozess per Pfad gestartet -> source/ ist nicht auf sys.path.
+# dirname(dirname(abspath(__file__))) == .../source
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from export import PG_CONFIG, OUTPUT_DIR, get_zoo_ids, export_zoo
 from export.cli import parse_args
