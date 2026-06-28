@@ -5,6 +5,7 @@ SQLite-Schreiblogik: _do_export, export_zoo, _increment_data_version.
 """
 
 import gzip
+import hashlib
 import logging
 import os
 import shutil
@@ -121,6 +122,39 @@ def _do_export(pg, zoo_id: int, slug: str, output_path: Path):
     finally:
         if tmp_sqlite.exists():
             tmp_sqlite.unlink()
+
+
+def _compute_media_manifest_hash(pg, zoo_id: int) -> str:
+    """
+    Berechnet einen Manifest-Hash ueber genau die Media-Zeilen, die ins Bundle
+    gehoeren (zoo_media + species_media) — rein in SQL, ohne Datei-I/O.
+
+    Erfasst Aenderungen durch:
+      - neue Eintraege (neue id + uploaded_at)
+      - geloeschte Eintraege (id faellt aus dem Aggregat)
+      - Membership-Aenderungen (neue Species im Zoo via enclosure_species)
+
+    Gleiche JOIN-Logik wie build_media_bundle, damit Hash und Bundle-Inhalt
+    konsistent bleiben. Ergebnis ist Text -> passt in zoo.zoos.media_hash.
+    """
+    with pg.cursor() as cur:
+        cur.execute("""
+            SELECT md5(string_agg(sig, ',' ORDER BY sig)) FROM (
+                SELECT m.id || ':' || m.filename || ':' || m.uploaded_at::text AS sig
+                FROM zoo.media m
+                WHERE m.zoo_id = %s
+                UNION
+                SELECT DISTINCT m.id || ':' || m.filename || ':' || m.uploaded_at::text
+                FROM zoo.media m
+                JOIN zoo.species s ON s.id = m.entity_id
+                    AND m.entity_type = 'species'
+                JOIN zoo.enclosure_species es ON es.species_id = s.id
+                WHERE es.zoo_id = %s
+            ) t
+        """, (zoo_id, zoo_id))
+        row = cur.fetchone()
+    # Bei 0 Media-Zeilen liefert md5(NULL) NULL -> stabilen Leer-Hash zurueckgeben
+    return row[0] if row and row[0] else "empty"
 
 
 def build_media_bundle(pg, zoo_id: int, slug: str,
@@ -242,13 +276,55 @@ def export_zoo(pg, zoo_id: int, slug: str, output_dir: Path) -> Path:
         logging.error(f"Export {slug} fehlgeschlagen: {e}")
         raise
 
-    # Media-Bundle nach erfolgreichem SQLite-Export bauen
+    # Media-Bundle nach erfolgreichem SQLite-Export bauen.
+    # Einzige Quelle der Wahrheit fuer media_version: Manifest-Hash-Vergleich.
     try:
+        new_hash = _compute_media_manifest_hash(pg, zoo_id)
+
         with pg.cursor() as cur:
-            cur.execute("SELECT media_version FROM zoo.zoos WHERE id = %s", (zoo_id,))
+            cur.execute(
+                "SELECT media_version, media_hash FROM zoo.zoos WHERE id = %s",
+                (zoo_id,)
+            )
             row = cur.fetchone()
-            media_version = row[0] if row else 0
-        build_media_bundle(pg, zoo_id, slug, output_dir, media_version)
+            current_version = row[0] if row else 0
+            current_hash    = row[1] if row else None
+
+        bundle_path = output_dir / f"{slug}_media_v{current_version}.zip"
+
+        if new_hash == current_hash and bundle_path.is_file():
+            # Keine Aenderung an den Medien UND Bundle existiert -> nichts tun.
+            logging.info(
+                f"Media-Bundle {slug} unveraendert (v{current_version}, "
+                f"hash={new_hash[:12]}) — Build uebersprungen"
+            )
+        else:
+            if new_hash == current_hash:
+                # Hash gleich, aber Bundle-Datei fehlt -> neu bauen, KEIN Bump
+                target_version = current_version
+                logging.info(
+                    f"Media-Bundle {slug} fehlt auf Disk — Neubau ohne Bump "
+                    f"(v{target_version})"
+                )
+            else:
+                # Echte Aenderung -> Bump + Hash speichern (ein UPDATE, ein commit)
+                with pg.cursor() as cur:
+                    cur.execute("""
+                        UPDATE zoo.zoos
+                        SET media_version = COALESCE(media_version, 0) + 1,
+                            media_hash    = %s
+                        WHERE id = %s
+                        RETURNING media_version
+                    """, (new_hash, zoo_id))
+                    target_version = cur.fetchone()[0]
+                pg.commit()
+                logging.info(
+                    f"Media-Bundle {slug} geaendert -> v{target_version} "
+                    f"(hash={new_hash[:12]})"
+                )
+
+            build_media_bundle(pg, zoo_id, slug, output_dir, target_version)
+
     except Exception:
         # Media-Bundle-Fehler darf den SQLite-Export nicht rückgängig machen
         logging.exception(f"Media-Bundle {slug} fehlgeschlagen (SQLite-Export bleibt)")
