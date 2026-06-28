@@ -21,6 +21,7 @@ import logging
 import psycopg2.extras
 from flask import Blueprint, jsonify, request
 from helpers.authz import require_zoo_access
+from helpers.audit import log_action
 from helpers.coordinates import is_valid_slug, round_coordinates
 from db import get_pg_connection
 from extensions import limiter
@@ -230,6 +231,10 @@ def create_enclosure(zoo):
                 """, (es_id, t))
 
         pg.commit()
+        log_action("enclosure_created", actor_user_id=user_id,
+                   zoo_id=zoo_id, target_type="enclosure", target_id=es_id,
+                   details={"enclosure_species_id": es_id, "species_id": species_id,
+                             "enclosure_id": enclosure_id, "house_id": house_id})
         return jsonify({"id": es_id, "message": "Created"}), 201
     except Exception:
         logging.exception(f"Exception in POST /api/v1/zoos/{zoo}/enclosures")
@@ -319,6 +324,13 @@ def update_enclosure(zoo, es_id):
                     """, (es_id, t))
 
         pg.commit()
+        with pg.cursor() as _cur:
+            _cur.execute("SELECT id FROM zoo.zoos WHERE slug = %s", (zoo,))
+            _zr = _cur.fetchone()
+            _zoo_id = _zr[0] if _zr else None
+        log_action("enclosure_updated", actor_user_id=user_id,
+                   zoo_id=_zoo_id, target_type="enclosure", target_id=es_id,
+                   details={"enclosure_species_id": es_id, "fields": list(data.keys())})
         return jsonify({"message": "Updated"}), 200
     except Exception:
         logging.exception(f"Exception in PUT /api/v1/zoos/{zoo}/enclosures/{es_id}")
@@ -357,6 +369,13 @@ def delete_enclosure(zoo, es_id):
                 if cur.rowcount == 0:
                     return jsonify({"error": "Not found"}), 404
         pg.commit()
+        with pg.cursor() as _cur:
+            _cur.execute("SELECT id FROM zoo.zoos WHERE slug = %s", (zoo,))
+            _zr = _cur.fetchone()
+            _zoo_id = _zr[0] if _zr else None
+        log_action("enclosure_deleted", actor_user_id=user_id,
+                   zoo_id=_zoo_id, target_type="enclosure", target_id=es_id,
+                   details={"enclosure_species_id": es_id})
         return jsonify({"message": "Deleted"}), 200
     except Exception:
         logging.exception(f"Exception in DELETE /api/v1/zoos/{zoo}/enclosures/{es_id}")

@@ -20,6 +20,7 @@ import logging
 import psycopg2.extras
 from flask import Blueprint, jsonify, request
 from helpers.authz import require_zoo_access
+from helpers.audit import log_action
 from helpers.coordinates import is_valid_slug
 from db import get_pg_connection
 from extensions import limiter
@@ -203,6 +204,14 @@ def create_feeding_time(zoo, es_id):
             """, (es_id, feeding_time, day_of_week, note, is_public))
             ft_id = cur.fetchone()["id"]
         pg.commit()
+        with pg.cursor() as _cur:
+            _cur.execute("SELECT id FROM zoo.zoos WHERE slug = %s", (zoo,))
+            _zr = _cur.fetchone()
+            _zoo_id = _zr[0] if _zr else None
+        log_action("feeding_time_created", actor_user_id=user_id,
+                   zoo_id=_zoo_id, target_type="feeding_time", target_id=ft_id,
+                   details={"enclosure_species_id": es_id, "feeding_time": feeding_time,
+                             "day_of_week": day_of_week})
         return jsonify({"id": ft_id, "message": "Created"}), 201
     except Exception:
         logging.exception(
@@ -256,6 +265,13 @@ def update_feeding_time(zoo, es_id, ft_id):
                 WHERE id = %s
             """, values)
         pg.commit()
+        with pg.cursor() as _cur:
+            _cur.execute("SELECT id FROM zoo.zoos WHERE slug = %s", (zoo,))
+            _zr = _cur.fetchone()
+            _zoo_id = _zr[0] if _zr else None
+        log_action("feeding_time_updated", actor_user_id=user_id,
+                   zoo_id=_zoo_id, target_type="feeding_time", target_id=ft_id,
+                   details={"enclosure_species_id": es_id, "fields": list(data.keys())})
         return jsonify({"message": "Updated"}), 200
     except Exception:
         logging.exception(
@@ -290,6 +306,13 @@ def delete_feeding_time(zoo, es_id, ft_id):
             if cur.rowcount == 0:
                 return jsonify({"error": "Not found"}), 404
         pg.commit()
+        with pg.cursor() as _cur:
+            _cur.execute("SELECT id FROM zoo.zoos WHERE slug = %s", (zoo,))
+            _zr = _cur.fetchone()
+            _zoo_id = _zr[0] if _zr else None
+        log_action("feeding_time_deleted", actor_user_id=user_id,
+                   zoo_id=_zoo_id, target_type="feeding_time", target_id=ft_id,
+                   details={"enclosure_species_id": es_id})
         return jsonify({"message": "Deleted"}), 200
     except Exception:
         logging.exception(

@@ -6,6 +6,7 @@ from mimetypes import guess_type
 from flask import Blueprint, jsonify, request, send_file
 
 from helpers.authz import require_zoo_access
+from helpers.audit import log_action
 from db import get_pg_connection
 from extensions import limiter
 from storage import storage, STORAGE_DIR
@@ -212,6 +213,10 @@ def upload_media(entity_type, entity_id):
         # Einzige Quelle der Wahrheit: writer.py (Manifest-Hash beim Export).
 
         conn.commit()
+        log_action("media_uploaded", actor_user_id=user_id,
+                   zoo_id=zoo_id, target_type=entity_type, target_id=entity_id,
+                   details={"media_id": new_id, "filename": safe_filename,
+                             "mime_type": mime_type, "label": label})
         return jsonify({"id": new_id, "url": storage.url(storage_path), "message": "Uploaded"}), 201
 
     except Exception:
@@ -262,6 +267,9 @@ def delete_media(media_id):
         # Einzige Quelle der Wahrheit: writer.py (Manifest-Hash beim Export).
 
         conn.commit()
+        log_action("media_deleted", actor_user_id=user_id,
+                   zoo_id=row["zoo_id"], target_type="media", target_id=media_id,
+                   details={"zoo": zoo, "storage_path": row["storage_path"]})
         return jsonify({"message": "Deleted"}), 200
 
     except Exception:

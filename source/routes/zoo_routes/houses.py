@@ -5,6 +5,7 @@ from db import get_pg_connection
 from extensions import limiter
 from helpers.coordinates import is_valid_slug, round_coordinates
 from helpers.authz import require_zoo_access
+from helpers.audit import log_action
 
 houses_bp = Blueprint("houses_bp", __name__)
 
@@ -159,6 +160,9 @@ def create_house(zoo):
                     ON CONFLICT DO NOTHING
                 """, (house_id, lat, lon))
         pg.commit()
+        log_action("house_created", actor_user_id=user_id,
+                   zoo_id=zoo_row["id"], target_type="house", target_id=house_id,
+                   details={"name": name})
         return jsonify({"id": house_id, "message": "Created"}), 201
     except Exception:
         logging.exception(f"Exception in POST /api/v1/zoos/{zoo}/houses")
@@ -220,6 +224,13 @@ def update_house(zoo, house_id):
                             longitude = EXCLUDED.longitude
                 """, (house_id, lat, lon))
         pg.commit()
+        with pg.cursor() as _cur:
+            _cur.execute("SELECT id FROM zoo.zoos WHERE slug = %s", (zoo,))
+            _zr = _cur.fetchone()
+            _zoo_id = _zr[0] if _zr else None
+        log_action("house_updated", actor_user_id=user_id,
+                   zoo_id=_zoo_id, target_type="house", target_id=house_id,
+                   details={"house_id": house_id, "fields": list(data.keys())})
         return jsonify({"message": "Updated"}), 200
     except Exception:
         logging.exception(f"Exception in PUT /api/v1/zoos/{zoo}/houses/{house_id}")
@@ -249,6 +260,13 @@ def delete_house(zoo, house_id):
             if cur.rowcount == 0:
                 return jsonify({"error": "House not found"}), 404
         pg.commit()
+        with pg.cursor() as _cur:
+            _cur.execute("SELECT id FROM zoo.zoos WHERE slug = %s", (zoo,))
+            _zr = _cur.fetchone()
+            _zoo_id = _zr[0] if _zr else None
+        log_action("house_deleted", actor_user_id=user_id,
+                   zoo_id=_zoo_id, target_type="house", target_id=house_id,
+                   details={"house_id": house_id})
         return jsonify({"message": "Deleted"}), 200
     except Exception:
         logging.exception(f"Exception in DELETE /api/v1/zoos/{zoo}/houses/{house_id}")

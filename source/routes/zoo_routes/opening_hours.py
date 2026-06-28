@@ -39,6 +39,7 @@ from flask import Blueprint, jsonify, request
 from db import get_pg_connection
 from extensions import limiter
 from helpers.authz import require_zoo_access
+from helpers.audit import log_action
 from helpers.coordinates import is_valid_slug
 
 opening_hours_bp = Blueprint("opening_hours", __name__)
@@ -213,6 +214,9 @@ def create_zoo_opening_hour(zoo):
                   data.get("label") or None))
             oh_id = cur.fetchone()["id"]
         pg.commit()
+        log_action("zoo_oh_created", actor_user_id=user_id,
+                   zoo_id=zoo_id, target_type="zoo_opening_hours", target_id=oh_id,
+                   details={"day_of_week": data.get("day_of_week")})
         return jsonify({"id": oh_id, "message": "Created"}), 201
     except Exception:
         logging.exception(f"Exception in POST /api/v1/zoos/{zoo}/opening_hours")
@@ -249,6 +253,9 @@ def update_zoo_opening_hour(zoo, oh_id):
             if cur.rowcount == 0:
                 return jsonify({"error": "Not found"}), 404
         pg.commit()
+        log_action("zoo_oh_updated", actor_user_id=user_id,
+                   zoo_id=zoo_id, target_type="zoo_opening_hours", target_id=oh_id,
+                   details={"fields": list(data.keys())})
         return jsonify({"message": "Updated"}), 200
     except Exception:
         logging.exception(f"Exception in PUT /api/v1/zoos/{zoo}/opening_hours/{oh_id}")
@@ -279,6 +286,9 @@ def delete_zoo_opening_hour(zoo, oh_id):
             if cur.rowcount == 0:
                 return jsonify({"error": "Not found"}), 404
         pg.commit()
+        log_action("zoo_oh_deleted", actor_user_id=user_id,
+                   zoo_id=zoo_id, target_type="zoo_opening_hours", target_id=oh_id,
+                   details={"oh_id": oh_id})
         return jsonify({"message": "Deleted"}), 200
     except Exception:
         logging.exception(f"Exception in DELETE /api/v1/zoos/{zoo}/opening_hours/{oh_id}")
@@ -391,6 +401,11 @@ def create_location_opening_hour(zoo, loc_id):
                   data.get("label") or None))
             oh_id = cur.fetchone()["id"]
         pg.commit()
+        with pg.cursor() as _cur:
+            _zoo_id_loc = _get_zoo_id(_cur, zoo)
+        log_action("location_oh_created", actor_user_id=user_id,
+                   zoo_id=_zoo_id_loc, target_type="opening_hours", target_id=oh_id,
+                   details={"location_id": loc_id, "day_of_week": data.get("day_of_week")})
         return jsonify({"id": oh_id, "message": "Created"}), 201
     except Exception:
         logging.exception(f"Exception in POST .../locations/{loc_id}/opening_hours")
@@ -427,6 +442,11 @@ def update_location_opening_hour(zoo, loc_id, oh_id):
             if cur.rowcount == 0:
                 return jsonify({"error": "Not found"}), 404
         pg.commit()
+        with pg.cursor() as _cur:
+            _zoo_id_loc = _get_zoo_id(_cur, zoo)
+        log_action("location_oh_updated", actor_user_id=user_id,
+                   zoo_id=_zoo_id_loc, target_type="opening_hours", target_id=oh_id,
+                   details={"location_id": loc_id, "fields": list(data.keys())})
         return jsonify({"message": "Updated"}), 200
     except Exception:
         logging.exception(f"Exception in PUT .../locations/{loc_id}/opening_hours/{oh_id}")
@@ -457,6 +477,11 @@ def delete_location_opening_hour(zoo, loc_id, oh_id):
             if cur.rowcount == 0:
                 return jsonify({"error": "Not found"}), 404
         pg.commit()
+        with pg.cursor() as _cur:
+            _zoo_id_loc = _get_zoo_id(_cur, zoo)
+        log_action("location_oh_deleted", actor_user_id=user_id,
+                   zoo_id=_zoo_id_loc, target_type="opening_hours", target_id=oh_id,
+                   details={"location_id": loc_id})
         return jsonify({"message": "Deleted"}), 200
     except Exception:
         logging.exception(f"Exception in DELETE .../locations/{loc_id}/opening_hours/{oh_id}")
@@ -569,6 +594,11 @@ def create_house_opening_hour(zoo, house_id):
                   data.get("label") or None))
             oh_id = cur.fetchone()["id"]
         pg.commit()
+        with pg.cursor() as _cur:
+            _zoo_id_h = _get_zoo_id(_cur, zoo)
+        log_action("house_oh_created", actor_user_id=user_id,
+                   zoo_id=_zoo_id_h, target_type="house_opening_hours", target_id=oh_id,
+                   details={"house_id": house_id, "day_of_week": data.get("day_of_week")})
         return jsonify({"id": oh_id, "message": "Created"}), 201
     except Exception:
         logging.exception(f"Exception in POST .../houses/{house_id}/opening_hours")
@@ -605,6 +635,11 @@ def update_house_opening_hour(zoo, house_id, oh_id):
             if cur.rowcount == 0:
                 return jsonify({"error": "Not found"}), 404
         pg.commit()
+        with pg.cursor() as _cur:
+            _zoo_id_h = _get_zoo_id(_cur, zoo)
+        log_action("house_oh_updated", actor_user_id=user_id,
+                   zoo_id=_zoo_id_h, target_type="house_opening_hours", target_id=oh_id,
+                   details={"house_id": house_id, "fields": list(data.keys())})
         return jsonify({"message": "Updated"}), 200
     except Exception:
         logging.exception(f"Exception in PUT .../houses/{house_id}/opening_hours/{oh_id}")
@@ -635,6 +670,11 @@ def delete_house_opening_hour(zoo, house_id, oh_id):
             if cur.rowcount == 0:
                 return jsonify({"error": "Not found"}), 404
         pg.commit()
+        with pg.cursor() as _cur:
+            _zoo_id_h = _get_zoo_id(_cur, zoo)
+        log_action("house_oh_deleted", actor_user_id=user_id,
+                   zoo_id=_zoo_id_h, target_type="house_opening_hours", target_id=oh_id,
+                   details={"house_id": house_id})
         return jsonify({"message": "Deleted"}), 200
     except Exception:
         logging.exception(f"Exception in DELETE .../houses/{house_id}/opening_hours/{oh_id}")

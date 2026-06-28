@@ -108,21 +108,24 @@ def publish_zoo(zoo):
                     UPDATE zoo.zoos
                     SET data_version = COALESCE(data_version, 0) + 1
                     WHERE slug = %s
-                    RETURNING data_version
+                    RETURNING data_version, media_version
                 """, (zoo,))
                 row = cur.fetchone()
-                new_version = row[0] if row else None
+                new_version    = row[0] if row else None
+                media_version  = row[1] if row else None
             conn.commit()
 
             log_action("publish_success", actor_user_id=user_id,
                        zoo_id=zoo_id, target_type="zoo", target_id=zoo_id,
                        details={"zoo_slug": zoo, "duration_ms": duration_ms,
-                                "data_version": new_version})
+                                "data_version": new_version,
+                                "media_version": media_version})
 
             return jsonify({
-                "message":      f"Export für {zoo} erfolgreich",
-                "data_version": new_version,
-                "duration_ms":  duration_ms,
+                "message":       f"Export für {zoo} erfolgreich",
+                "data_version":  new_version,
+                "media_version": media_version,
+                "duration_ms":   duration_ms,
             }), 200
 
         finally:
