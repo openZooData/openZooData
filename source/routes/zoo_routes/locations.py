@@ -5,6 +5,7 @@ from db import get_pg_connection
 from extensions import limiter
 from helpers.coordinates import is_valid_slug, round_coordinates
 from helpers.authz import require_zoo_access
+from helpers.audit import log_action
 
 locations_bp = Blueprint("locations_bp", __name__)
 
@@ -186,6 +187,9 @@ def create_location(zoo):
                         UPDATE zoo.locations SET icon_media_id = %s WHERE id = %s
                     """, (media_id, location_id))
         pg.commit()
+        log_action("location_created", actor_user_id=user_id,
+                   zoo_id=zoo_row["id"], target_type="location", target_id=location_id,
+                   details={"name": name})
         return jsonify({"id": location_id, "message": "Created"}), 201
     except Exception:
         logging.exception(f"Exception in POST /api/v1/zoos/{zoo}/locations")
@@ -246,6 +250,13 @@ def update_location(zoo, location_id):
                             longitude = EXCLUDED.longitude
                 """, (location_id, lat, lon))
         pg.commit()
+        with pg.cursor() as _cur:
+            _cur.execute("SELECT id FROM zoo.zoos WHERE slug = %s", (zoo,))
+            _zr = _cur.fetchone()
+            _zoo_id = _zr[0] if _zr else None
+        log_action("location_updated", actor_user_id=user_id,
+                   zoo_id=_zoo_id, target_type="location", target_id=location_id,
+                   details={"location_id": location_id, "fields": list(data.keys())})
         return jsonify({"message": "Updated"}), 200
     except Exception:
         logging.exception(f"Exception in PUT /api/v1/zoos/{zoo}/locations/{location_id}")
@@ -281,6 +292,13 @@ def delete_location(zoo, location_id):
             if cur.rowcount == 0:
                 return jsonify({"error": "Location not found"}), 404
         pg.commit()
+        with pg.cursor() as _cur:
+            _cur.execute("SELECT id FROM zoo.zoos WHERE slug = %s", (zoo,))
+            _zr = _cur.fetchone()
+            _zoo_id = _zr[0] if _zr else None
+        log_action("location_deleted", actor_user_id=user_id,
+                   zoo_id=_zoo_id, target_type="location", target_id=location_id,
+                   details={"location_id": location_id})
         return jsonify({"message": "Deleted"}), 200
     except Exception:
         logging.exception(f"Exception in DELETE /api/v1/zoos/{zoo}/locations/{location_id}")

@@ -6,6 +6,7 @@ from mimetypes import guess_type
 from flask import Blueprint, jsonify, request, send_file
 
 from helpers.authz import require_zoo_access
+from helpers.audit import log_action
 from db import get_pg_connection
 from extensions import limiter
 from storage import storage, STORAGE_DIR
@@ -208,10 +209,31 @@ def upload_media(entity_type, entity_id):
             ))
             new_id = cur.fetchone()["id"]
 
+            # Auto-Link: media_id direkt auf der Entity-Tabelle setzen,
+            # damit kein separater PUT nötig ist.
+            # species + enclosure_species: bereits weiter oben erledigt.
+            # domain + zoo: kein einzelnes Bild-Feld → kein Auto-Link.
+            _LINK = {
+                "house":     ("zoo.houses",     "image_media_id"),
+                "enclosure": ("zoo.enclosures", "image_media_id"),
+                "location":  ("zoo.locations",
+                              "icon_media_id" if label == "icon" else "image_media_id"),
+            }
+            if entity_type in _LINK:
+                _tbl, _col = _LINK[entity_type]
+                cur.execute(
+                    f"UPDATE {_tbl} SET {_col} = %s WHERE id = %s",
+                    (new_id, entity_id)
+                )
+
         # media_version wird NICHT mehr hier erhoeht.
         # Einzige Quelle der Wahrheit: writer.py (Manifest-Hash beim Export).
 
         conn.commit()
+        log_action("media_uploaded", actor_user_id=user_id,
+                   zoo_id=zoo_id, target_type=entity_type, target_id=entity_id,
+                   details={"media_id": new_id, "filename": safe_filename,
+                             "mime_type": mime_type, "label": label})
         return jsonify({"id": new_id, "url": storage.url(storage_path), "message": "Uploaded"}), 201
 
     except Exception:
@@ -262,6 +284,9 @@ def delete_media(media_id):
         # Einzige Quelle der Wahrheit: writer.py (Manifest-Hash beim Export).
 
         conn.commit()
+        log_action("media_deleted", actor_user_id=user_id,
+                   zoo_id=row["zoo_id"], target_type="media", target_id=media_id,
+                   details={"zoo": zoo, "storage_path": row["storage_path"]})
         return jsonify({"message": "Deleted"}), 200
 
     except Exception:

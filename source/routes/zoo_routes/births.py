@@ -27,6 +27,7 @@ import logging
 import psycopg2.extras
 from flask import Blueprint, jsonify, request
 from helpers.authz import require_zoo_access
+from helpers.audit import log_action
 from helpers.coordinates import is_valid_slug
 from db import get_pg_connection
 from extensions import limiter
@@ -216,6 +217,10 @@ def create_birth(zoo, es_id):
             """, (es_id, species_id, zoo_id, birth_date, count, note, is_public))
             birth_id = cur.fetchone()["id"]
         pg.commit()
+        log_action("birth_created", actor_user_id=user_id,
+                   zoo_id=zoo_id, target_type="birth", target_id=birth_id,
+                   details={"enclosure_species_id": es_id, "species_id": species_id,
+                             "birth_date": birth_date, "count": count})
         return jsonify({"id": birth_id, "message": "Created"}), 201
     except Exception:
         logging.exception(
@@ -271,6 +276,13 @@ def update_birth(zoo, es_id, birth_id):
                 WHERE id = %s
             """, values)
         pg.commit()
+        with pg.cursor() as _cur:
+            _cur.execute("SELECT id FROM zoo.zoos WHERE slug = %s", (zoo,))
+            _zr = _cur.fetchone()
+            _zoo_id = _zr[0] if _zr else None
+        log_action("birth_updated", actor_user_id=user_id,
+                   zoo_id=_zoo_id, target_type="birth", target_id=birth_id,
+                   details={"enclosure_species_id": es_id, "fields": list(data.keys())})
         return jsonify({"message": "Updated"}), 200
     except Exception:
         logging.exception(f"Exception in PUT .../births/{birth_id}")
@@ -309,6 +321,13 @@ def delete_birth(zoo, es_id, birth_id):
             if cur.rowcount == 0:
                 return jsonify({"error": "Not found"}), 404
         pg.commit()
+        with pg.cursor() as _cur:
+            _cur.execute("SELECT id FROM zoo.zoos WHERE slug = %s", (zoo,))
+            _zr = _cur.fetchone()
+            _zoo_id = _zr[0] if _zr else None
+        log_action("birth_deleted", actor_user_id=user_id,
+                   zoo_id=_zoo_id, target_type="birth", target_id=birth_id,
+                   details={"enclosure_species_id": es_id})
         return jsonify({"message": "Deleted"}), 200
     except Exception:
         logging.exception(f"Exception in DELETE .../births/{birth_id}")

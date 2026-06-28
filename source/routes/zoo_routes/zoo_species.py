@@ -1,10 +1,14 @@
 import logging
+import os
+import subprocess
+import sys
 import psycopg2.extras
 from flask import Blueprint, jsonify, request
 from db import get_pg_connection
 from extensions import limiter
 from helpers.coordinates import is_valid_slug
-from helpers.authz import require_zoo_access
+from helpers.authz import require_zoo_access, require_super_admin
+from helpers.audit import log_action
 
 zoo_species_bp = Blueprint("zoo_species_bp", __name__)
 
@@ -75,3 +79,58 @@ def get_zoo_species(zoo):
         return jsonify({"error": "Internal server error"}), 500
     finally:
         if pg: pg.close()
+
+
+@zoo_species_bp.route("/api/v1/species/<int:species_id>/icon/generate", methods=["POST"])
+@limiter.limit("5 per minute")
+def generate_species_icon(species_id):
+    """
+    Stößt die Icon-Generierung für eine Species via OpenAI Images API an.
+    Läuft asynchron (Fire-and-forget) — Antwort kommt sofort (202).
+    Nur super_admin.
+    """
+    user_id, err = require_super_admin()
+    if err: return err
+
+    pg = None
+    try:
+        pg = get_pg_connection()
+        with pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT id, german_name, latin_name FROM zoo.species WHERE id = %s
+            """, (species_id,))
+            row = cur.fetchone()
+        if not row:
+            return jsonify({"error": "Species not found"}), 404
+    except Exception:
+        logging.exception(f"Exception in POST /api/v1/species/{species_id}/icon/generate (DB)")
+        return jsonify({"error": "Internal server error"}), 500
+    finally:
+        if pg:
+            pg.close()
+
+    try:
+        script_path = os.path.join(
+            os.path.dirname(__file__), "..", "..", "tools", "generate_species_icons.py"
+        )
+        subprocess.Popen(
+            [sys.executable, script_path, "--species", str(species_id), "--force"],
+            close_fds=True,
+        )
+        logging.info(
+            f"Icon-Generierung gestartet: species_id={species_id} "
+            f"({row['german_name']})"
+        )
+        log_action("species_icon_generate_triggered", actor_user_id=user_id,
+                   target_type="species", target_id=species_id,
+                   details={"german_name": row["german_name"], "latin_name": row["latin_name"]})
+    except Exception:
+        logging.exception(f"Exception beim Starten der Icon-Generierung für species_id={species_id}")
+        return jsonify({"error": "Icon-Generierung konnte nicht gestartet werden"}), 500
+
+    return jsonify({
+        "message": "Icon-Generierung gestartet",
+        "species_id": species_id,
+        "german_name": row["german_name"],
+        "latin_name": row["latin_name"],
+    }), 202

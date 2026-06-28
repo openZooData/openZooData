@@ -25,6 +25,7 @@ from helpers.coordinates import is_valid_slug, round_coordinates
 from db import get_pg_connection
 from extensions import limiter
 from storage import storage
+from helpers.audit import log_action
 
 enclosure_species_bp = Blueprint("enclosure_species", __name__)
 
@@ -338,6 +339,10 @@ def create_enclosure(zoo):
                     b.get("note"), b.get("is_public", True)))
 
         pg.commit()
+        log_action("enclosure_species_created", actor_user_id=user_id,
+                   zoo_id=zoo_id, target_type="enclosure_species", target_id=es_id,
+                   details={"enclosure_species_id": es_id, "species_id": species_id,
+                             "enclosure_id": enclosure_id, "house_id": house_id})
         return jsonify({"id": es_id, "message": "Created"}), 201
     except Exception:
         logging.exception(f"Exception in POST /api/v1/zoos/{zoo}/enclosures")
@@ -450,6 +455,9 @@ def update_enclosure(zoo, es_id):
                         b.get("note"), b.get("is_public", True)))
 
         pg.commit()
+        log_action("enclosure_species_updated", actor_user_id=user_id,
+                   zoo_id=es_zoo_id, target_type="enclosure_species", target_id=es_id,
+                   details={"enclosure_species_id": es_id, "fields": list(data.keys())})
         return jsonify({"message": "Updated"}), 200
     except Exception:
         logging.exception(f"Exception in PUT /api/v1/zoos/{zoo}/enclosures/{es_id}")
@@ -485,11 +493,13 @@ def delete_enclosure(zoo, es_id):
             # eine enclosure_id/house_id gesetzt ist. Schließt die alte
             # Tenant-Isolation-Lücke im Fallback-Zweig.
             cur.execute("""
-                SELECT id FROM zoo.enclosure_species
+                SELECT id, zoo_id FROM zoo.enclosure_species
                 WHERE id = %s AND zoo_id = (SELECT id FROM zoo.zoos WHERE slug = %s)
             """, (es_id, zoo))
-            if not cur.fetchone():
+            es_row = cur.fetchone()
+            if not es_row:
                 return jsonify({"error": "Not found"}), 404
+            es_zoo_id = es_row["zoo_id"]
 
             # Verwaiste media-Dateien aufräumen (physische Datei + Zeile)
             cur.execute("""
@@ -517,6 +527,9 @@ def delete_enclosure(zoo, es_id):
             """, (es_id,))
 
         pg.commit()
+        log_action("enclosure_species_deleted", actor_user_id=user_id,
+                   zoo_id=es_zoo_id, target_type="enclosure_species", target_id=es_id,
+                   details={"enclosure_species_id": es_id})
         return jsonify({"message": "Deleted"}), 200
     except Exception:
         logging.exception(f"Exception in DELETE /api/v1/zoos/{zoo}/enclosures/{es_id}")

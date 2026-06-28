@@ -14,6 +14,7 @@ from flask import Blueprint, jsonify, request
 from db import get_pg_connection
 from extensions import limiter
 from helpers.authz import require_authenticated, require_super_admin, require_zoo_access, require_any_write_access
+from helpers.audit import log_action
 from helpers.wikidata import fetch_species_data, build_species_filename
 
 species_bp = Blueprint("species", __name__)
@@ -199,6 +200,9 @@ def create_species():
                 new_species["icon_filename"]  = filename
 
         pg.commit()
+        log_action("species_created", actor_user_id=user_id,
+                   target_type="species", target_id=new_species["id"],
+                   details={"german_name": german_name, "wikidata_id": wikidata_id})
         return jsonify({
             **new_species,
             "message": f"Tier '{german_name}' erfolgreich angelegt"
@@ -315,6 +319,9 @@ def delete_species(species_id):
             """, (species_id,))
 
         pg.commit()
+        log_action("species_deleted", actor_user_id=actor_id,
+                   target_type="species", target_id=species_id,
+                   details={"species_id": species_id})
         return jsonify({"message": "Deleted"}), 200
     except Exception:
         logging.exception(f"Exception in DELETE /api/v1/species/{species_id}")
