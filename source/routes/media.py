@@ -208,13 +208,8 @@ def upload_media(entity_type, entity_id):
             ))
             new_id = cur.fetchone()["id"]
 
-        # media_version inkrementieren
-        if zoo_id:
-            with conn.cursor() as cur_mv:
-                cur_mv.execute("""
-                    UPDATE zoo.zoos SET media_version = media_version + 1
-                    WHERE id = %s
-                """, (zoo_id,))
+        # media_version wird NICHT mehr hier erhoeht.
+        # Einzige Quelle der Wahrheit: writer.py (Manifest-Hash beim Export).
 
         conn.commit()
         return jsonify({"id": new_id, "url": storage.url(storage_path), "message": "Uploaded"}), 201
@@ -263,13 +258,8 @@ def delete_media(media_id):
 
             storage.delete(row["storage_path"])
             cur.execute("DELETE FROM zoo.media WHERE id = %s", (media_id,))
-        # media_version inkrementieren
-        if zoo:
-            with conn.cursor() as cur_mv:
-                cur_mv.execute("""
-                    UPDATE zoo.zoos SET media_version = media_version + 1
-                    WHERE slug = %s
-                """, (zoo,))
+        # media_version wird NICHT mehr hier erhoeht.
+        # Einzige Quelle der Wahrheit: writer.py (Manifest-Hash beim Export).
 
         conn.commit()
         return jsonify({"message": "Deleted"}), 200
