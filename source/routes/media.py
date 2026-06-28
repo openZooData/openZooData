@@ -209,6 +209,23 @@ def upload_media(entity_type, entity_id):
             ))
             new_id = cur.fetchone()["id"]
 
+            # Auto-Link: media_id direkt auf der Entity-Tabelle setzen,
+            # damit kein separater PUT nötig ist.
+            # species + enclosure_species: bereits weiter oben erledigt.
+            # domain + zoo: kein einzelnes Bild-Feld → kein Auto-Link.
+            _LINK = {
+                "house":     ("zoo.houses",     "image_media_id"),
+                "enclosure": ("zoo.enclosures", "image_media_id"),
+                "location":  ("zoo.locations",
+                              "icon_media_id" if label == "icon" else "image_media_id"),
+            }
+            if entity_type in _LINK:
+                _tbl, _col = _LINK[entity_type]
+                cur.execute(
+                    f"UPDATE {_tbl} SET {_col} = %s WHERE id = %s",
+                    (new_id, entity_id)
+                )
+
         # media_version wird NICHT mehr hier erhoeht.
         # Einzige Quelle der Wahrheit: writer.py (Manifest-Hash beim Export).
 
