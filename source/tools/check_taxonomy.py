@@ -11,6 +11,19 @@ Aufruf:
     python3 tools/check_taxonomy.py --dry-run # nur prüfen
 """
 
+import os
+import sys
+from pathlib import Path
+
+# Zentrale .env-Ladung -> os.environ (vereinheitlicht, siehe helpers/env_loader.py)
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from helpers.env_loader import load_env
+try:
+    load_env()
+except RuntimeError:
+    pass  # Variablen evtl. schon vom Eltern-Prozess vererbt
+
+
 import argparse
 import requests
 import psycopg2
@@ -18,26 +31,13 @@ import psycopg2.extras
 from pathlib import Path
 import time
 
-def load_env():
-    env = {}
-    for path in [Path.home() / ".env"]:
-        if path.exists():
-            for line in path.read_text().splitlines():
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    k, v = line.split("=", 1)
-                    env[k.strip()] = v.strip()
-            break
-    return env
-
-env = load_env()
 
 PG_CONFIG = {
-    "host":     env.get("PG_HOST"),
-    "user":     env.get("PG_USER"),
-    "password": env.get("PG_PASSWORD"),
-    "dbname":   env.get("PG_NAME"),
-    "port":     int(env.get("PG_PORT", env.get("DB_PORT", "5432"))),
+    "host":     os.environ.get("PG_HOST"),
+    "user":     os.environ.get("PG_USER"),
+    "password": os.environ.get("PG_PASSWORD"),
+    "dbname":   os.environ.get("PG_NAME"),
+    "port":     int(os.environ.get("PG_PORT", os.environ.get("DB_PORT", "5432"))),
     "options":  "-c search_path=zoo,public",
 }
 

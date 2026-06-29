@@ -24,6 +24,19 @@ Output:
     enrich_species.sql — SQL zum Einspielen in Postico
 """
 
+import os
+import sys
+from pathlib import Path
+
+# Zentrale .env-Ladung -> os.environ (vereinheitlicht, siehe helpers/env_loader.py)
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from helpers.env_loader import load_env
+try:
+    load_env()
+except RuntimeError:
+    pass  # Variablen evtl. schon vom Eltern-Prozess vererbt
+
+
 import sys
 import time
 import argparse
@@ -35,26 +48,13 @@ from typing import Dict, List
 
 # ─── Konfiguration ────────────────────────────────────────────────────────────
 
-def load_env() -> Dict[str, str]:
-    env = {}
-    for path in [Path(__file__).parent / ".env", Path.home() / ".env"]:
-        if path.exists():
-            for line in path.read_text().splitlines():
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    k, v = line.split("=", 1)
-                    env[k.strip()] = v.strip()
-            break
-    return env
-
-env = load_env()
 
 DB_CONFIG = {
-    "host":     env.get("PG_HOST"),
-    "user":     env.get("PG_USER"),
-    "password": env.get("PG_PASSWORD"),
-    "dbname":   env.get("PG_NAME"),
-    "port":     int(env.get("DB_PORT", "5432")),
+    "host":     os.environ.get("PG_HOST"),
+    "user":     os.environ.get("PG_USER"),
+    "password": os.environ.get("PG_PASSWORD"),
+    "dbname":   os.environ.get("PG_NAME"),
+    "port":     int(os.environ.get("DB_PORT", "5432")),
     "options":  "-c search_path=zoo,public",
 }
 
@@ -72,6 +72,44 @@ TAX_RANKS = {
 }
 
 # ─── Wikidata SPARQL ──────────────────────────────────────────────────────────
+
+def resolve_qid_by_latin_name(latin_name: str) -> str | None:
+    """
+    Sucht via P225 (taxon name) die Wikidata-QID zu einem lateinischen Namen.
+    Gibt die QID zurück (z.B. "Q26012") oder None.
+
+    Bei 0 oder >1 Treffern -> None (kein Rateschluss; Aufrufer fällt auf die
+    DB-wikidata_id zurück). So wird keine falsche Art zugeordnet.
+    """
+    if not latin_name or not latin_name.strip():
+        return None
+
+    name = latin_name.strip().replace('"', '\\"')
+    sparql = f'''
+    SELECT ?taxon WHERE {{
+      ?taxon wdt:P225 "{name}".
+    }} LIMIT 5
+    '''
+    try:
+        r = requests.get(
+            WIKIDATA_SPARQL,
+            params={"query": sparql, "format": "json"},
+            timeout=15,
+            headers={"User-Agent": "ZooGuide/1.0 (thorsten@iborg.de)"}
+        )
+        r.raise_for_status()
+        bindings = r.json().get("results", {}).get("bindings", [])
+        time.sleep(API_DELAY)
+
+        qids = {b["taxon"]["value"].split("/")[-1] for b in bindings if "taxon" in b}
+        if len(qids) == 1:
+            return qids.pop()
+        # 0 oder mehrdeutig -> kein Treffer
+        return None
+    except Exception:
+        time.sleep(API_DELAY)
+        return None
+
 
 def fetch_species_data(wikidata_id: str) -> Dict:
     """
@@ -160,11 +198,24 @@ def fetch_species_data(wikidata_id: str) -> Dict:
 
 # ─── Datenbank ────────────────────────────────────────────────────────────────
 
-def load_species(conn, all_species: bool = False) -> List[Dict]:
-    where = "" if all_species else "AND wiki_fetched_at IS NULL"
+def load_species(conn, mode: str = "missing") -> List[Dict]:
+    """
+    mode='missing'  -> Tiere ohne Taxonomie (tax_class_id IS NULL),
+                       unabhängig von wiki_fetched_at. Erfasst auch Tiere
+                       deren früherer Abruf nichts lieferte.
+    mode='new'      -> nur nie abgerufene (wiki_fetched_at IS NULL).
+    mode='all'      -> alle validen Species (komplettes Refresh).
+    """
+    if mode == "all":
+        where = ""
+    elif mode == "new":
+        where = "AND wiki_fetched_at IS NULL"
+    else:  # missing
+        where = "AND tax_class_id IS NULL"
+
     with conn.cursor() as cur:
         cur.execute(f"""
-            SELECT id, german_name, wikidata_id
+            SELECT id, german_name, wikidata_id, latin_name
             FROM species
             WHERE id_valid = TRUE
               AND wikidata_id IS NOT NULL
@@ -172,7 +223,47 @@ def load_species(conn, all_species: bool = False) -> List[Dict]:
             ORDER BY id
         """)
         rows = cur.fetchall()
-    return [{"id": r[0], "name": r[1], "wikidata_id": r[2]} for r in rows]
+    return [{"id": r[0], "name": r[1], "wikidata_id": r[2], "latin_name": r[3]}
+            for r in rows]
+
+
+def write_species(conn, species_id: int, data: dict) -> None:
+    """
+    Schreibt Taxonomie/IUCN/GBIF einer Species direkt in die DB.
+    wiki_fetched_at wird IMMER auf NOW() gesetzt — auch wenn data leer ist —
+    damit Items ohne Wikidata-Taxonomie (z.B. Haustierrassen ohne P171)
+    nicht bei jedem Lauf erneut abgefragt werden.
+    Pro Species ein eigener Commit: robust gegen Abbruch.
+    """
+    with conn.cursor() as cur:
+        cur.execute("""
+            UPDATE species SET
+                tax_kingdom_id           = %s,
+                tax_phylum_id            = %s,
+                tax_class_id             = %s,
+                tax_order_id             = %s,
+                tax_family_id            = %s,
+                tax_genus_id             = %s,
+                iucn_status_id           = COALESCE(%s, iucn_status_id),
+                iucn_population_trend_id = COALESCE(%s, iucn_population_trend_id),
+                iucn_id                  = COALESCE(%s, iucn_id),
+                gbif_taxon_key           = COALESCE(%s, gbif_taxon_key),
+                wiki_fetched_at          = NOW()
+            WHERE id = %s
+        """, (
+            data.get("tax_kingdom_id"),
+            data.get("tax_phylum_id"),
+            data.get("tax_class_id"),
+            data.get("tax_order_id"),
+            data.get("tax_family_id"),
+            data.get("tax_genus_id"),
+            data.get("iucn_status_id"),
+            data.get("iucn_population_trend_id"),
+            data.get("iucn_id"),
+            data.get("gbif_taxon_key"),
+            species_id,
+        ))
+    conn.commit()
 
 # ─── SQL generieren ───────────────────────────────────────────────────────────
 
@@ -235,11 +326,27 @@ def generate_sql(results: List[Dict]) -> str:
 def main():
     parser = argparse.ArgumentParser(description="Wikidata Species Anreicherung")
     parser.add_argument("--all", action="store_true",
-                        help="Alle validen Species anreichern (auch bereits geholte)")
+                        help="Alle validen Species (komplettes Refresh, überschreibt vorhandene)")
+    parser.add_argument("--new", action="store_true",
+                        help="Nur nie abgerufene (wiki_fetched_at IS NULL)")
+    parser.add_argument("--species", type=int, metavar="ID",
+                        help="Nur eine einzelne Species-ID (zum Testen)")
     args = parser.parse_args()
 
+    if args.all:
+        mode = "all"
+    elif args.new:
+        mode = "new"
+    else:
+        mode = "missing"  # Default: Tiere ohne Taxonomie
+
+    mode_label = {"all": "alle validen (Refresh)",
+                  "new": "nur nie abgerufene",
+                  "missing": "ohne Taxonomie"}[mode]
+
     print("🌿 Zoo Guide — Wikidata Species Anreicherung")
-    print(f"   Modus: {'alle validen' if args.all else 'nur nicht-angereicherte'}")
+    print(f"   Modus: {mode_label}" + (f" | nur ID {args.species}" if args.species else ""))
+    print("   Schreibt direkt in die Datenbank.")
     print("=" * 50)
 
     print("\n📡 Verbinde mit Datenbank...")
@@ -250,12 +357,28 @@ def main():
         print(f"   ❌ {e}")
         sys.exit(1)
 
-    species_list = load_species(conn, all_species=args.all)
-    conn.close()
+    species_list = load_species(conn, mode=mode)
+
+    # Optional auf eine einzelne ID einschränken (Test)
+    if args.species is not None:
+        species_list = [s for s in species_list if s["id"] == args.species]
+        if not species_list:
+            # Auch wenn sie nicht im Filter ist: direkt laden (Test erzwingen)
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT id, german_name, wikidata_id, latin_name FROM species
+                    WHERE id = %s AND wikidata_id IS NOT NULL
+                """, (args.species,))
+                row = cur.fetchone()
+            if row:
+                species_list = [{"id": row[0], "name": row[1],
+                                 "wikidata_id": row[2], "latin_name": row[3]}]
+
     print(f"   {len(species_list)} Species zu verarbeiten")
 
     if not species_list:
-        print("\n✅ Alle Species bereits angereichert!")
+        print("\n✅ Nichts zu tun!")
+        conn.close()
         sys.exit(0)
 
     print(f"\n🔍 Rufe Wikidata-Daten ab ({len(species_list)} Species)...")
@@ -268,10 +391,36 @@ def main():
     for i, s in enumerate(species_list, 1):
         print(f"  [{i:3}/{len(species_list)}] {s['name']} ({s['wikidata_id']})", end=" ... ")
 
-        data = fetch_species_data(s["wikidata_id"])
+        # Primär: QID über lateinischen Namen auflösen (P225).
+        # Rückfall: die in der DB hinterlegte wikidata_id.
+        resolved_qid = resolve_qid_by_latin_name(s.get("latin_name"))
+        used_qid = resolved_qid or s["wikidata_id"]
+        qid_source = "Name" if resolved_qid else "DB-QID"
+
+        data = fetch_species_data(used_qid)
+
+        # Wenn die namensaufgelöste QID keine Taxonomie brachte, mit der
+        # DB-QID gegenprüfen (nur falls beide unterschiedlich sind).
+        if resolved_qid and resolved_qid != s["wikidata_id"]:
+            has_tax_resolved = any(data.get(f"tax_{l}_id") for l in
+                                   ["kingdom","phylum","class","order","family","genus"])
+            if not has_tax_resolved:
+                fallback = fetch_species_data(s["wikidata_id"])
+                if any(fallback.get(f"tax_{l}_id") for l in
+                       ["kingdom","phylum","class","order","family","genus"]):
+                    data = fallback
+                    qid_source = "DB-QID (Fallback)"
+
+        print(f"[{qid_source}: {used_qid}]", end=" ")
 
         if not data:
-            print("❌ Fehler")
+            # Kein Wikidata-Treffer: wiki_fetched_at trotzdem setzen, damit
+            # dieses Item nicht bei jedem Lauf erneut abgefragt wird.
+            try:
+                write_species(conn, s["id"], {})
+            except Exception:
+                conn.rollback()
+            print("❌ keine Wikidata-Daten (markiert)")
             no_data.append(s)
             continue
 
@@ -284,6 +433,17 @@ def main():
         if has_iucn: status_parts.append("IUCN ✅")
         if not has_tax and not has_iucn:
             status_parts.append("keine Daten")
+
+        # Direkt in die DB schreiben (pro Species ein Commit)
+        try:
+            write_species(conn, s["id"], data)
+            status_parts.append("→ DB ✅")
+        except Exception as e:
+            conn.rollback()
+            status_parts.append(f"→ DB-FEHLER: {e}")
+            no_data.append(s)
+            print(" | ".join(status_parts))
+            continue
 
         print(" | ".join(status_parts))
 
@@ -320,14 +480,11 @@ def main():
         if len(partial_data) > 10:
             print(f"   ... und {len(partial_data)-10} weitere")
 
-    # SQL generieren
+    conn.close()
+
+    print(f"\n💾 {len(results)} Species direkt in die DB geschrieben.")
     if results:
-        sql = generate_sql(results)
-        sql_path = Path(__file__).parent / "enrich_species.sql"
-        sql_path.write_text(sql, encoding="utf-8")
-        print(f"\n📄 SQL: {sql_path}")
         print("\nNächster Schritt:")
-        print("  → enrich_species.sql in Postico einspielen")
         print("  → python3 tools/export_sqlite.py --all  (SQLite neu generieren)")
 
     print("\n✅ Fertig!")

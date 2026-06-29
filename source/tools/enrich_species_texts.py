@@ -13,6 +13,19 @@ Beispiele:
     python3 tools/enrich_species_texts.py --lang de --shard-count 4 --shard-index 0
 """
 
+import os
+import sys
+from pathlib import Path
+
+# Zentrale .env-Ladung -> os.environ (vereinheitlicht, siehe helpers/env_loader.py)
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from helpers.env_loader import load_env
+try:
+    load_env()
+except RuntimeError:
+    pass  # Variablen evtl. schon vom Eltern-Prozess vererbt
+
+
 import argparse
 import time
 import logging
@@ -27,32 +40,14 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
 from pathlib import Path
 
-def load_env():
-    env = {}
-    for path in [
-        Path(__file__).parent.parent.parent / ".env",  # Projektverzeichnis
-        Path.home() / ".env",                          # Fallback
-    ]:
-        if not path.exists():
-            continue
-        with open(path, encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith("#") or "=" not in line:
-                    continue
-                key, value = line.split("=", 1)
-                env[key.strip()] = value.strip().strip('"').strip("'")
-    return env
-
-env = load_env()
 
 
 PG_CONFIG = {
-    "host": env.get("PG_HOST"),
-    "user": env.get("PG_USER"),
-    "password": env.get("PG_PASSWORD"),
-    "dbname": env.get("PG_NAME", "zooguide"),
-    "port": int(env.get("PG_PORT", "5432")),
+    "host": os.environ.get("PG_HOST"),
+    "user": os.environ.get("PG_USER"),
+    "password": os.environ.get("PG_PASSWORD"),
+    "dbname": os.environ.get("PG_NAME", "zooguide"),
+    "port": int(os.environ.get("PG_PORT", "5432")),
     "options": "-c search_path=zoo,public",
 }
 
@@ -118,10 +113,10 @@ def get_openai_key(shard_index: int = 0) -> str:
     Fallback: OPENAI_API_KEY_1 wenn kein Shard-Index gesetzt.
     """
     key_name = f"OPENAI_API_KEY_{shard_index + 1}"
-    api_key  = env.get(key_name)
+    api_key  = os.environ.get(key_name)
     if not api_key:
         # Fallback auf Key 1 wenn spezifischer Key fehlt
-        api_key = env.get("OPENAI_API_KEY_1")
+        api_key = os.environ.get("OPENAI_API_KEY_1")
     if not api_key:
         raise RuntimeError(
             f"{key_name} fehlt in ~/.env. "
