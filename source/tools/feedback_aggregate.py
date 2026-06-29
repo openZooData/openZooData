@@ -15,11 +15,18 @@ Ausführen:
 """
 
 import os
+import sys
 import argparse
 import logging
-from dotenv import load_dotenv
+from pathlib import Path
 
-load_dotenv(os.path.join(os.path.expanduser("~"), "tools", ".env"))
+# Zentrale .env-Ladung -> os.environ (vereinheitlicht, siehe helpers/env_loader.py)
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from helpers.env_loader import load_env
+try:
+    load_env()
+except RuntimeError:
+    pass  # Variablen evtl. schon vom Eltern-Prozess vererbt
 
 import psycopg2
 import psycopg2.extras

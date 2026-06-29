@@ -8,40 +8,29 @@ Aufruf:
     python3 source/tools/test_connections.py
 """
 
+import os
+import sys
+from pathlib import Path
+
+# Zentrale .env-Ladung -> os.environ (vereinheitlicht, siehe helpers/env_loader.py)
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from helpers.env_loader import load_env
+try:
+    load_env()
+except RuntimeError:
+    pass  # Variablen evtl. schon vom Eltern-Prozess vererbt
+
+
 import sys
 from pathlib import Path
 
 import psycopg2
 
 
-def load_env() -> dict[str, str]:
-    env: dict[str, str] = {}
-
-    candidates = [
-        Path(".env"),
-        Path(__file__).resolve().parents[2] / ".env",
-        Path.home() / ".env",
-    ]
-
-    env_path = next((p for p in candidates if p.exists()), None)
-    if env_path is None:
-        raise RuntimeError("No .env file found")
-
-    for line in env_path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        env[key.strip()] = value.strip().strip('"').strip("'")
-
-    return env
-
-
-env = load_env()
 
 
 def require_env(name: str) -> str:
-    value = env.get(name)
+    value = os.environ.get(name)
     if not value:
         raise RuntimeError(f"Missing required environment variable: {name}")
     return value
@@ -70,7 +59,8 @@ def test_pg_auth() -> None:
         user=require_env("AUTH_USER"),
         password=require_env("AUTH_PASSWORD"),
         dbname=require_env("AUTH_NAME"),
-        port=int(env.get("AUTH_PORT", "5432")),
+        port=int(os.environ.get("AUTH_PORT", "5432")),
+        options="-c search_path=auth,public",
     )
     cur = conn.cursor()
     cur.execute("SELECT current_database()")
@@ -90,7 +80,7 @@ def test_pg_zooguide() -> None:
         user=require_env("PG_USER"),
         password=require_env("PG_PASSWORD"),
         dbname=require_env("PG_NAME"),
-        port=int(env.get("PG_PORT", "5432")),
+        port=int(os.environ.get("PG_PORT", "5432")),
         options="-c search_path=zoo,public",
     )
     cur = conn.cursor()

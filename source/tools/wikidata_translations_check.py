@@ -23,6 +23,19 @@ Output:
     translations_check_report.txt — Abweichungen pro Zoo, Sprache und Tier
 """
 
+import os
+import sys
+from pathlib import Path
+
+# Zentrale .env-Ladung -> os.environ (vereinheitlicht, siehe helpers/env_loader.py)
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from helpers.env_loader import load_env
+try:
+    load_env()
+except RuntimeError:
+    pass  # Variablen evtl. schon vom Eltern-Prozess vererbt
+
+
 import sys
 import time
 import re
@@ -34,25 +47,13 @@ from typing import Optional, List, Dict
 
 # ─── Konfiguration ────────────────────────────────────────────────────────────
 
-def load_env():
-    env = {}
-    env_file = Path(__file__).parent / ".env"
-    if env_file.exists():
-        for line in env_file.read_text().splitlines():
-            line = line.strip()
-            if line and not line.startswith("#") and "=" in line:
-                k, v = line.split("=", 1)
-                env[k.strip()] = v.strip()
-    return env
-
-env = load_env()
 
 DB_CONFIG = {
-    "host":     env.get("PG_HOST"),
-    "user":     env.get("PG_USER"),
-    "password": env.get("PG_PASSWORD"),
-    "dbname":   env.get("PG_NAME"),
-    "port":     int(env.get("DB_PORT", "5432")),
+    "host":     os.environ.get("PG_HOST"),
+    "user":     os.environ.get("PG_USER"),
+    "password": os.environ.get("PG_PASSWORD"),
+    "dbname":   os.environ.get("PG_NAME"),
+    "port":     int(os.environ.get("DB_PORT", "5432")),
 }
 
 PRODUCTIVE_ZOOS = ["zoo_berlin", "zoo_muenster", "zoo_osnabrueck", "zoo_rheine"]

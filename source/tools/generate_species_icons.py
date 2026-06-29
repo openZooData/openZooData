@@ -24,6 +24,7 @@ import argparse
 import base64
 import json
 import logging
+import os
 import sys
 import time
 import urllib.error
@@ -32,6 +33,11 @@ from pathlib import Path
 
 import psycopg2
 import psycopg2.extras
+
+# Skript wird als Subprozess (von der API) oder als Cronjob gestartet.
+# source/ muss auf sys.path damit helpers.env_loader importierbar ist.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from helpers.env_loader import load_env
 
 
 logging.basicConfig(
@@ -43,41 +49,29 @@ logging.basicConfig(
 
 # ─── Konfiguration ────────────────────────────────────────────────────────────
 
-def load_env() -> dict:
-    env = {}
-
-    for path in [
-        Path(__file__).parent.parent.parent / ".env",
-        Path(__file__).parent.parent / ".env",
-        Path.home() / ".env",
-    ]:
-        if path.exists():
-            for line in path.read_text().splitlines():
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    k, v = line.split("=", 1)
-                    env[k.strip()] = v.strip().strip('"').strip("'")
-            logging.info(f".env geladen: {path}")
-            break
-
-    return env
-
-
-env = load_env()
+# Zentrale .env-Ladung -> os.environ. Idempotent: wenn die API dieses Skript
+# als Subprozess startet, sind die Variablen bereits vom Parent vererbt;
+# load_env() lädt beim Standalone-/Cron-Aufruf aus der Datei. Eine Quelle.
+try:
+    _loaded = load_env()
+    logging.info(f".env geladen: {_loaded}")
+except RuntimeError:
+    # Variablen evtl. schon vom Eltern-Prozess vererbt -> os.environ nutzen
+    logging.info("Keine .env-Datei gefunden — nutze vererbte Umgebungsvariablen")
 
 PG_CONFIG = {
-    "host": env.get("PG_HOST"),
-    "user": env.get("PG_USER"),
-    "password": env.get("PG_PASSWORD"),
-    "dbname": env.get("PG_NAME", "zooguide"),
-    "port": int(env.get("PG_PORT", "5432")),
+    "host": os.environ.get("PG_HOST"),
+    "user": os.environ.get("PG_USER"),
+    "password": os.environ.get("PG_PASSWORD"),
+    "dbname": os.environ.get("PG_NAME", "zooguide"),
+    "port": int(os.environ.get("PG_PORT", "5432")),
     "options": "-c search_path=zoo,public",
 }
 
 STORAGE_DIR = Path(
-    env.get(
+    os.environ.get(
         "STORAGE_DIR",
-        str(Path(__file__).parent.parent.parent / "media"),
+        str(Path(__file__).resolve().parent.parent.parent / "media"),
     )
 )
 
@@ -88,13 +82,13 @@ OPENAI_IMAGE_URL = "https://api.openai.com/v1/images/generations"
 # Bestes aktuelles Modell für Bildgenerierung.
 # Falls dein Account noch keinen Zugriff auf gpt-image-2 hat:
 # in .env setzen: OPENAI_IMAGE_MODEL=gpt-image-1
-IMAGE_MODEL = env.get("OPENAI_IMAGE_MODEL", "gpt-image-2")
+IMAGE_MODEL = os.environ.get("OPENAI_IMAGE_MODEL", "gpt-image-2")
 
-IMAGE_SIZE = env.get("OPENAI_IMAGE_SIZE", "1024x1024")
-IMAGE_QUALITY = env.get("OPENAI_IMAGE_QUALITY", "high")
+IMAGE_SIZE = os.environ.get("OPENAI_IMAGE_SIZE", "1024x1024")
+IMAGE_QUALITY = os.environ.get("OPENAI_IMAGE_QUALITY", "high")
 
 # Für Cronjob konservativ lassen.
-SLEEP_BETWEEN = int(env.get("OPENAI_IMAGE_SLEEP", "12"))
+SLEEP_BETWEEN = int(os.environ.get("OPENAI_IMAGE_SLEEP", "12"))
 
 
 # ─── Prompt ──────────────────────────────────────────────────────────────────
@@ -339,7 +333,7 @@ def main():
 
     args = parser.parse_args()
 
-    api_key = env.get("OPENAI_API_KEY_1") or env.get("OPENAI_API_KEY")
+    api_key = os.environ.get("OPENAI_API_KEY_1") or os.environ.get("OPENAI_API_KEY")
 
     if not api_key:
         logging.error("OPENAI_API_KEY_1 oder OPENAI_API_KEY fehlt in .env")
